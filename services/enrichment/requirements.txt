@@ -1,0 +1,8 @@
+# Kafka/RedPanda client
+kafka-python==2.0.2
+
+# Logging and monitoring
+structlog==23.1.0
+
+# Configuration and environment
+python-dotenv==1.0.0

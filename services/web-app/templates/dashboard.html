@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Cloud Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            height: 400px; /* Fixed height for charts */
+        }
+        
+        .chart-card h3 {
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 320px; /* Fixed height for chart canvas */
+            width: 100%;
+        }
+        
+        .data-tabs {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .tab-button {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 20px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .message-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .message-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .message-type {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .message-timestamp {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .message-summary {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .message-summary h4 {
+            margin: 0 0 8px 0;
+            color: #333;
+            font-size: 1rem;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .summary-item {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 5px;
+            border-left: 3px solid #667eea;
+        }
+        
+        .summary-label {
+            font-size: 0.8rem;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .summary-value {
+            font-size: 0.9rem;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .message-details {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+            display: none;
+        }
+        
+        .message-details.show {
+            display: block;
+        }
+        
+        .toggle-details {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+        
+        .toggle-details:hover {
+            background: #5a6268;
+        }
+        
+        .message-content {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            transition: background 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .icon {
+            width: 24px;
+            height: 24px;
+        }
+        
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                🚀 IoT Cloud Dashboard
+            </h1>
+            <p>Real-time monitoring of IoT data flow through RedPanda</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="total-raw">0</div>
+                <div class="stat-label">Raw Messages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="total-enriched">0</div>
+                <div class="stat-label">Enriched Messages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="devices">0</div>
+                <div class="stat-label">Devices</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="last-raw">-</div>
+                <div class="stat-label">Last Raw Message</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="last-enriched">-</div>
+                <div class="stat-label">Last Enriched Message</div>
+            </div>
+            <div class="stat-card">
+                <div class="status-badge" id="kafka-status">Disconnected</div>
+                <div class="stat-label">Kafka Status</div>
+            </div>
+        </div>
+        
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>📊 Message Types Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="messageTypesChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>📈 Message Rate (Last 10 minutes)</h3>
+                <div class="chart-container">
+                    <canvas id="messageRateChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="data-tabs">
+            <div class="tab-buttons">
+                <button class="tab-button active" onclick="showTab('raw')">Raw Data</button>
+                <button class="tab-button" onclick="showTab('enriched')">Enriched Data</button>
+            </div>
+            
+            <div class="tab-content active" id="raw-tab">
+                <button class="refresh-btn" onclick="refreshMessages()">🔄 Refresh Messages</button>
+                <div class="message-list" id="raw-messages">
+                    <p>No raw messages received yet</p>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="enriched-tab">
+                <button class="refresh-btn" onclick="refreshMessages()">🔄 Refresh Messages</button>
+                <div class="message-list" id="enriched-messages">
+                    <p>No enriched messages received yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let messageTypesChart, messageRateChart;
+        let messageRateData = [];
+        
+        // Initialize charts
+        function initCharts() {
+            // Message Types Chart
+            const typesCtx = document.getElementById('messageTypesChart').getContext('2d');
+            messageTypesChart = new Chart(typesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['telemetry'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#f5576c'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // Message Rate Chart
+            const rateCtx = document.getElementById('messageRateChart').getContext('2d');
+            messageRateChart = new Chart(rateCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Messages per minute',
+                        data: [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Show tab content
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+        
+        // Format timestamp
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        }
+        
+        // Format time ago
+        function formatTimeAgo(seconds) {
+            if (seconds === null || seconds === undefined) return '-';
+            if (seconds < 60) return `${seconds}s ago`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            return `${Math.floor(seconds / 3600)}h ago`;
+        }
+        
+        // Update dashboard with new data
+        function updateDashboard(data) {
+            // Update stats
+            document.getElementById('total-raw').textContent = data.stats.total_raw_messages;
+            document.getElementById('total-enriched').textContent = data.stats.total_enriched_messages;
+            document.getElementById('devices').textContent = data.stats.devices_seen.length;
+            document.getElementById('last-raw').textContent = formatTimeAgo(data.stats.last_raw_message_ago);
+            document.getElementById('last-enriched').textContent = formatTimeAgo(data.stats.last_enriched_message_ago);
+            
+            // Update Kafka status
+            const statusElement = document.getElementById('kafka-status');
+            if (data.stats.kafka_connected) {
+                statusElement.textContent = 'Connected';
+                statusElement.className = 'status-badge status-connected';
+            } else {
+                statusElement.textContent = 'Disconnected';
+                statusElement.className = 'status-badge status-disconnected';
+            }
+            
+            // Update message types chart
+            const messageTypes = data.stats.message_types;
+            const labels = Object.keys(messageTypes);
+            const values = Object.values(messageTypes);
+            
+            messageTypesChart.data.labels = labels;
+            messageTypesChart.data.datasets[0].data = values;
+            messageTypesChart.update();
+            
+            // Update message rate chart
+            const now = new Date();
+            const currentMinute = now.getMinutes();
+            
+            // Add current minute if not exists
+            if (!messageRateData.find(d => d.minute === currentMinute)) {
+                messageRateData.push({
+                    minute: currentMinute,
+                    count: data.stats.total_raw_messages + data.stats.total_enriched_messages
+                });
+                
+                // Keep only last 10 minutes
+                if (messageRateData.length > 10) {
+                    messageRateData.shift();
+                }
+            }
+            
+            const rateLabels = messageRateData.map(d => `${now.getHours()}:${d.minute.toString().padStart(2, '0')}`);
+            const rateValues = messageRateData.map(d => d.count);
+            
+            messageRateChart.data.labels = rateLabels;
+            messageRateChart.data.datasets[0].data = rateValues;
+            messageRateChart.update();
+        }
+        
+        // Toggle message details visibility
+        function toggleDetails(button) {
+            const detailsDiv = button.nextElementSibling;
+            const isVisible = detailsDiv.classList.contains('show');
+            
+            if (isVisible) {
+                detailsDiv.classList.remove('show');
+                button.textContent = 'Show Details';
+            } else {
+                detailsDiv.classList.add('show');
+                button.textContent = 'Hide Details';
+            }
+        }
+        
+        // Display messages
+        function displayMessages(messages, containerId, messageType) {
+            const container = document.getElementById(containerId);
+            
+            if (messages.length === 0) {
+                container.innerHTML = `<p>No ${messageType} messages received yet</p>`;
+                return;
+            }
+            
+            container.innerHTML = messages.map(msg => {
+                const summary = JSON.stringify(msg, null, 2).substring(0, 200) + '...';
+                const details = JSON.stringify(msg, null, 2);
+                return `
+                    <div class="message-item">
+                        <div class="message-header">
+                            <span class="message-type">${msg._kafka_info?.message_type || messageType}</span>
+                            <span class="message-timestamp">${formatTimestamp(msg.timestamp)}</span>
+                        </div>
+                        <div class="message-summary">
+                            <h4>Summary</h4>
+                            <div class="summary-grid">
+                                <div class="summary-item">
+                                    <span class="summary-label">Message Type:</span>
+                                    <span class="summary-value">${msg._kafka_info?.message_type || messageType}</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">Timestamp:</span>
+                                    <span class="summary-value">${formatTimestamp(msg.timestamp)}</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">Device ID:</span>
+                                    <span class="summary-value">${msg.device_id || 'N/A'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="toggle-details" onclick="toggleDetails(this)">Show Details</button>
+                        <div class="message-details" data-details='${JSON.stringify(msg, null, 2)}'>
+                            <pre>${details}</pre>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Refresh messages from API
+        function refreshMessages() {
+            axios.get('/api/messages')
+                .then(response => {
+                    if (response.data.success) {
+                        updateDashboard(response.data);
+                        displayMessages(response.data.raw_messages, 'raw-messages', 'raw');
+                        displayMessages(response.data.enriched_messages, 'enriched-messages', 'enriched');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching messages:', error);
+                });
+        }
+        
+        // Update stats periodically
+        function updateStats() {
+            axios.get('/api/stats')
+                .then(response => {
+                    if (response.data.success) {
+                        updateDashboard(response.data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching stats:', error);
+                });
+        }
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            
+            // Initial load
+            refreshMessages();
+            
+            // Update every 5 seconds
+            setInterval(updateStats, 5000);
+            
+            // Refresh messages every 10 seconds
+            setInterval(refreshMessages, 10000);
+        });
+    </script>
+</body>
+</html>

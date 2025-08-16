@@ -1,0 +1,211 @@
+{
+  "device_types": {
+    "smart_breaker": {
+      "name": "Smart Circuit Breaker",
+      "description": "Intelligent circuit breaker with monitoring and protection capabilities",
+      "category": "electrical_protection",
+      "capabilities": [
+        "voltage_monitoring",
+        "current_monitoring", 
+        "power_monitoring",
+        "frequency_monitoring",
+        "temperature_monitoring",
+        "status_monitoring",
+        "protection_monitoring",
+        "operational_monitoring"
+      ],
+      "measurements": {
+        "voltage": {
+          "unit": "V",
+          "description": "Line voltage per phase",
+          "min_value": 110.0,
+          "max_value": 130.0,
+          "data_type": "float",
+          "phases": ["phase_a", "phase_b", "phase_c"]
+        },
+        "current": {
+          "unit": "A", 
+          "description": "Current draw per phase",
+          "min_value": 0.0,
+          "max_value": 100.0,
+          "data_type": "float",
+          "phases": ["phase_a", "phase_b", "phase_c"]
+        },
+        "power": {
+          "unit": "W",
+          "description": "Power consumption metrics",
+          "components": {
+            "active": {"min_value": 0.0, "max_value": 12000.0},
+            "reactive": {"min_value": 0.0, "max_value": 8000.0},
+            "apparent": {"min_value": 0.0, "max_value": 15000.0},
+            "factor": {"min_value": 0.7, "max_value": 1.0}
+          },
+          "data_type": "object"
+        },
+        "frequency": {
+          "unit": "Hz",
+          "description": "AC frequency",
+          "min_value": 59.0,
+          "max_value": 61.0,
+          "data_type": "float"
+        },
+        "temperature": {
+          "unit": "°C",
+          "description": "Operating temperature",
+          "min_value": 20.0,
+          "max_value": 80.0,
+          "data_type": "float"
+        },
+        "status": {
+          "description": "Device operational status",
+          "components": {
+            "breaker": {"valid_values": [0, 1], "description": "Breaker state (0=open, 1=closed)"},
+            "position": {"valid_values": [0, 1], "description": "Mechanical position"},
+            "communication": {"valid_values": [0, 1], "description": "Communication status"}
+          },
+          "data_type": "object"
+        },
+        "protection": {
+          "description": "Protection system status",
+          "components": {
+            "trip_count": {"min_value": 0, "max_value": 999, "description": "Number of trips"},
+            "ground_fault_current": {"min_value": 0.0, "max_value": 100.0, "unit": "A"},
+            "arc_fault_detected": {"valid_values": [true, false], "description": "Arc fault status"},
+            "harmonic_distortion": {"min_value": 0.0, "max_value": 20.0, "unit": "%"}
+          },
+          "data_type": "object"
+        },
+        "operational": {
+          "description": "Operational metrics",
+          "components": {
+            "load_percentage": {"min_value": 0.0, "max_value": 100.0, "unit": "%"},
+            "operating_hours": {"min_value": 0.0, "max_value": 87600, "unit": "hours"},
+            "maintenance_due": {"valid_values": [true, false], "description": "Maintenance status"}
+          },
+          "data_type": "object"
+        }
+      },
+      "manufacturers": [
+        {
+          "name": "ElectroCorp",
+          "models": ["SB-2000", "SB-3000", "SB-5000"],
+          "specifications": {
+            "voltage_rating": "480V",
+            "current_rating": "100A",
+            "protection_class": "Class A",
+            "communication_protocol": "Modbus TCP/IP"
+          }
+        },
+        {
+          "name": "PowerTech",
+          "models": ["PT-Breaker-X1", "PT-Breaker-X2"],
+          "specifications": {
+            "voltage_rating": "600V",
+            "current_rating": "200A", 
+            "protection_class": "Class B",
+            "communication_protocol": "Ethernet/IP"
+          }
+        }
+      ],
+      "locations": [
+        "electrical_room_a",
+        "electrical_room_b", 
+        "main_distribution",
+        "substation_primary",
+        "substation_secondary"
+      ],
+      "data_format": "json",
+      "update_frequency": "5_seconds",
+      "retention_policy": "30_days"
+    },
+    "smart_meter": {
+      "name": "Smart Energy Meter",
+      "description": "Advanced energy consumption monitoring device",
+      "category": "energy_monitoring",
+      "capabilities": [
+        "energy_consumption_monitoring",
+        "demand_monitoring",
+        "power_quality_monitoring",
+        "billing_data_collection"
+      ],
+      "measurements": {
+        "energy": {
+          "unit": "kWh",
+          "description": "Energy consumption",
+          "data_type": "float"
+        },
+        "demand": {
+          "unit": "kW",
+          "description": "Power demand",
+          "data_type": "float"
+        },
+        "power_factor": {
+          "unit": "dimensionless",
+          "description": "Power factor",
+          "min_value": 0.8,
+          "max_value": 1.0,
+          "data_type": "float"
+        }
+      },
+      "manufacturers": [
+        {
+          "name": "EnergyMetrics",
+          "models": ["EM-100", "EM-200", "EM-500"]
+        }
+      ],
+      "data_format": "json",
+      "update_frequency": "1_minute",
+      "retention_policy": "1_year"
+    },
+    "environmental_sensor": {
+      "name": "Environmental Monitoring Sensor",
+      "description": "Multi-parameter environmental sensor",
+      "category": "environmental_monitoring",
+      "capabilities": [
+        "temperature_monitoring",
+        "humidity_monitoring",
+        "pressure_monitoring",
+        "air_quality_monitoring"
+      ],
+      "measurements": {
+        "temperature": {
+          "unit": "°C",
+          "description": "Ambient temperature",
+          "min_value": -40.0,
+          "max_value": 85.0,
+          "data_type": "float"
+        },
+        "humidity": {
+          "unit": "%RH",
+          "description": "Relative humidity",
+          "min_value": 0.0,
+          "max_value": 100.0,
+          "data_type": "float"
+        },
+        "pressure": {
+          "unit": "hPa",
+          "description": "Atmospheric pressure",
+          "min_value": 300.0,
+          "max_value": 1100.0,
+          "data_type": "float"
+        }
+      },
+      "manufacturers": [
+        {
+          "name": "EnvSense",
+          "models": ["ES-100", "ES-200"]
+        }
+      ],
+      "data_format": "json",
+      "update_frequency": "30_seconds",
+      "retention_policy": "90_days"
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2025-08-15",
+    "description": "Device type registry for IoT Cloud platform",
+    "schema_version": "1.0",
+    "contact": "iot-platform-team@company.com"
+  }
+}

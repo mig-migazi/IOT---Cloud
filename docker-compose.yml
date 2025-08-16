@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # RedPanda - Event streaming platform
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: iot-cloud-redpanda
+    restart: unless-stopped
+    ports:
+      - "8084:8081"     # HTTP API (Schema Registry)
+      - "8085:8082"     # Admin API (PandaProxy)
+      - "9092:9092"     # Kafka API (OUTSIDE)
+      - "29092:29092"   # Kafka API (PLAINTEXT)
+      - "9644:9644"     # Metrics
+    command:
+      - redpanda
+      - start
+      - --smp 1
+      - --memory 1G
+      - --reserve-memory 0M
+      - --overprovisioned
+      - --node-id 0
+      - --check=false
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+      - --pandaproxy-addr 0.0.0.0:8082
+      - --advertise-pandaproxy-addr localhost:8082
+      - --schema-registry-addr 0.0.0.0:8081
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    networks:
+      - iot-cloud-network
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # RedPanda Console - Web UI for RedPanda management
+  redpanda-console:
+    image: redpandadata/console:latest
+    container_name: iot-cloud-redpanda-console
+    restart: unless-stopped
+    ports:
+      - "8086:8080"     # Web UI
+    environment:
+      - REDPANDA_BROKERS=redpanda:29092
+      - REDPANDA_SCHEMA_REGISTRY_URL=http://redpanda:8081
+      - KAFKA_BROKERS=redpanda:29092
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
+  # Enrichment Service - Processes raw messages and adds device metadata
+  enrichment-service:
+    build: ./services/enrichment
+    container_name: iot-cloud-enrichment
+    restart: unless-stopped
+    environment:
+      - REDPANDA_BROKERS=redpanda:29092
+      - RAW_TOPIC=iot.raw
+      - ENRICHED_TOPIC=iot.enriched
+      - DEVICE_REGISTRY_PATH=/app/config/device-registry.json
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
+  # Smart Breaker Simulator - Generates realistic device data
+  smart-breaker-simulator:
+    build: ./services/simulator
+    container_name: iot-cloud-simulator
+    restart: unless-stopped
+    environment:
+      - REDPANDA_BROKERS=redpanda:29092
+      - RAW_TOPIC=iot.raw
+      - DEVICE_ID=breaker-001
+      - PUBLISH_INTERVAL=5
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
+  # Web App - Message flow visualization dashboard
+  web-app:
+    build: ./services/web-app
+    container_name: iot-cloud-web-app
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    environment:
+      - REDPANDA_BROKERS=redpanda:29092
+      - ENRICHED_TOPIC=iot.enriched
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
+volumes:
+  redpanda_data:
+
+networks:
+  iot-cloud-network:
+    driver: bridge

@@ -12,6 +12,7 @@ class ApplicationRegistrationSchema(Schema):
         allow_none=True, 
         validate=validate.OneOf(['web', 'mobile', 'desktop', 'api'])
     )
+    devicetypes = fields.List(fields.Str(), allow_none=True, missing=list)
 
 class ApplicationUpdateSchema(Schema):
     """Schema for application updates"""
@@ -25,6 +26,7 @@ class ApplicationUpdateSchema(Schema):
         allow_none=True, 
         validate=validate.OneOf(['web', 'mobile', 'desktop', 'api'])
     )
+    devicetypes = fields.List(fields.Str(), allow_none=True, missing=list)
     status = fields.Str(
         allow_none=True,
         validate=validate.OneOf(['active', 'inactive', 'pending'])
@@ -40,6 +42,7 @@ class ApplicationResponseSchema(Schema):
     contact_email = fields.Email()
     category = fields.Str()
     platform = fields.Str()
+    devicetypes = fields.List(fields.Str())
     status = fields.Str()
     api_key = fields.Str()
     created_at = fields.Str()

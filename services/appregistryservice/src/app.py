@@ -217,8 +217,9 @@ def create_app():
         """Get all applications that have registered for a specific device type"""
         try:
             # Query applications that have the specified device type in their devicetypes array
+            # Use JSON_CONTAINS for proper JSON array searching
             applications = Application.query.filter(
-                Application.devicetypes.contains([device_type]),
+                Application.devicetypes.contains(device_type),
                 Application.status == 'active'  # Only return active applications
             ).all()
             
@@ -233,7 +234,7 @@ def create_app():
                 'error': 'Internal server error',
                 'message': str(e)
             }), 500
-    
+
     @app.route('/api/applications/by-device-types', methods=['POST'])
     def get_applications_by_multiple_device_types():
         """Get all applications that have registered for any of the specified device types"""
@@ -247,8 +248,10 @@ def create_app():
                 }), 400
             
             # Query applications that have any of the specified device types
+            # Use OR conditions for multiple device types
+            from sqlalchemy import or_
             applications = Application.query.filter(
-                Application.devicetypes.overlap(device_types),
+                or_(*[Application.devicetypes.contains(dt) for dt in device_types]),
                 Application.status == 'active'  # Only return active applications
             ).all()
             

@@ -3,637 +3,932 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IoT Cloud Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <title>IoT Cloud Platform Dashboard</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
             color: #333;
+            min-height: 100vh;
         }
-        
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+
         .container {
             max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 20px auto;
+            padding: 0 20px;
         }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            color: white;
-        }
-        
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-        }
-        
-        .header p {
-            font-size: 1.2rem;
-            opacity: 0.9;
-        }
-        
-        .stats-grid {
+
+        .status-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
-        
-        .stat-card {
-            background: white;
-            padding: 20px;
+
+        .status-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             border-radius: 15px;
+            padding: 25px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            transition: transform 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .stat-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-        
-        .status-connected {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .status-disconnected {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .chart-card {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            height: 400px; /* Fixed height for charts */
-        }
-        
-        .chart-card h3 {
-            margin-bottom: 20px;
-            color: #333;
+
+        .status-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-healthy { background: #27ae60; }
+        .status-warning { background: #f39c12; }
+        .status-error { background: #e74c3c; }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            font-weight: 500;
+            color: #7f8c8d;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+
+        .metric-value.success { color: #27ae60; }
+        .metric-value.warning { color: #f39c12; }
+        .metric-value.error { color: #e74c3c; }
+
+        .data-flow-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-flow-section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .flow-step {
+            text-align: center;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .flow-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            color: white;
+            font-size: 24px;
+        }
+
+        .flow-arrow {
+            font-size: 24px;
+            color: #7f8c8d;
+        }
+
+        .flow-label {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .flow-description {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            height: 400px;
+        }
+
+        .chart-card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+
         .chart-container {
             position: relative;
-            height: 320px; /* Fixed height for chart canvas */
+            height: 320px;
             width: 100%;
         }
-        
-        .data-tabs {
-            background: white;
+
+        .messages-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
         }
-        
-        .tab-buttons {
+
+        .messages-section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .message-tabs {
             display: flex;
-            background: #f8f9fa;
-            border-bottom: 1px solid #dee2e6;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ecf0f1;
         }
-        
-        .tab-button {
-            flex: 1;
-            padding: 15px 20px;
-            border: none;
+
+        .message-tab {
+            padding: 12px 24px;
             background: none;
+            border: none;
             cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            color: #666;
+            font-size: 1em;
+            color: #7f8c8d;
+            border-bottom: 2px solid transparent;
             transition: all 0.3s ease;
         }
-        
-        .tab-button.active {
-            background: white;
+
+        .message-tab.active {
             color: #667eea;
-            border-bottom: 3px solid #667eea;
+            border-bottom-color: #667eea;
         }
-        
-        .tab-content {
+
+        .message-tab:hover {
+            color: #667eea;
+        }
+
+        .message-content {
             display: none;
-            padding: 20px;
         }
-        
-        .tab-content.active {
+
+        .message-content.active {
             display: block;
         }
-        
-        .message-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        
+
         .message-item {
             background: #f8f9fa;
+            border-radius: 8px;
             padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 10px;
+            margin-bottom: 15px;
             border-left: 4px solid #667eea;
         }
-        
+
         .message-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
         }
-        
+
         .message-type {
             background: #667eea;
             color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.8rem;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
             font-weight: 600;
         }
-        
+
         .message-timestamp {
-            color: #666;
-            font-size: 0.9rem;
+            color: #7f8c8d;
+            font-size: 0.9em;
         }
-        
+
         .message-summary {
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            border: 1px solid #e9ecef;
+            margin-bottom: 15px;
         }
-        
+
         .message-summary h4 {
-            margin: 0 0 8px 0;
-            color: #333;
-            font-size: 1rem;
+            color: #2c3e50;
+            margin-bottom: 10px;
         }
-        
+
         .summary-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-bottom: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
         }
-        
+
         .summary-item {
-            background: #f8f9fa;
-            padding: 8px;
-            border-radius: 5px;
-            border-left: 3px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #ecf0f1;
         }
-        
+
         .summary-label {
-            font-size: 0.8rem;
-            color: #666;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .summary-value {
-            font-size: 0.9rem;
-            color: #333;
             font-weight: 500;
+            color: #7f8c8d;
         }
-        
-        .message-details {
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #e9ecef;
-            display: none;
+
+        .summary-value {
+            font-weight: 600;
+            color: #2c3e50;
         }
-        
-        .message-details.show {
-            display: block;
-        }
-        
+
         .toggle-details {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            margin-bottom: 10px;
-        }
-        
-        .toggle-details:hover {
-            background: #5a6268;
-        }
-        
-        .message-content {
-            font-family: 'Courier New', monospace;
-            font-size: 0.8rem;
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            overflow-x: auto;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .refresh-btn {
             background: #667eea;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
+            padding: 8px 16px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 20px;
+            font-size: 0.9em;
             transition: background 0.3s ease;
         }
-        
-        .refresh-btn:hover {
+
+        .toggle-details:hover {
             background: #5a6fd8;
         }
-        
-        .icon {
-            width: 24px;
-            height: 24px;
+
+        .message-details {
+            display: none;
+            margin-top: 15px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
         }
-        
+
+        .message-details pre {
+            margin: 0;
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85em;
+        }
+
+        .refresh-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            font-size: 20px;
+        }
+
+        .refresh-button:hover {
+            background: #5a6fd8;
+            transform: scale(1.1);
+        }
+
         @media (max-width: 768px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
+            .flow-diagram {
+                flex-direction: column;
             }
             
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+            
+            .charts-section {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
+    <div class="header">
+        <h1>🚀 IoT Cloud Platform Dashboard</h1>
+        <p>Real-time monitoring of data flow, device types, and application registrations</p>
+    </div>
+
     <div class="container">
-        <div class="header">
-            <h1>
-                🚀 IoT Cloud Dashboard
-            </h1>
-            <p>Real-time monitoring of IoT data flow through RedPanda</p>
+        <!-- System Status Overview -->
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>
+                    <span class="status-indicator" id="kafka-status"></span>
+                    Kafka/RedPanda Status
+                </h3>
+                <div class="metric">
+                    <span class="metric-label">Connection</span>
+                    <span class="metric-value" id="kafka-connection">Checking...</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Topics</span>
+                    <span class="metric-value" id="kafka-topics">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Messages/sec</span>
+                    <span class="metric-value" id="kafka-throughput">-</span>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h3>
+                    <span class="status-indicator" id="simulator-status"></span>
+                    Simulator Status
+                </h3>
+                <div class="metric">
+                    <span class="metric-label">Device ID</span>
+                    <span class="metric-value" id="simulator-device">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Message Rate</span>
+                    <span class="metric-value" id="simulator-rate">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Last Activity</span>
+                    <span class="metric-value" id="simulator-activity">-</span>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h3>
+                    <span class="status-indicator" id="enrichment-status"></span>
+                    Enrichment Service
+                </h3>
+                <div class="metric">
+                    <span class="metric-label">Status</span>
+                    <span class="metric-value" id="enrichment-status-text">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Messages Processed</span>
+                    <span class="metric-value" id="enrichment-processed">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">App Registry Queries</span>
+                    <span class="metric-value" id="enrichment-queries">-</span>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h3>
+                    <span class="status-indicator" id="app-registry-status"></span>
+                    App Registry Service
+                </h3>
+                <div class="metric">
+                    <span class="metric-label">Status</span>
+                    <span class="metric-value" id="app-registry-status-text">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Applications</span>
+                    <span class="metric-value" id="app-registry-count">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Device Types</span>
+                    <span class="metric-value" id="app-registry-device-types">-</span>
+                </div>
+            </div>
         </div>
-        
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="total-raw">0</div>
-                <div class="stat-label">Raw Messages</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="total-enriched">0</div>
-                <div class="stat-label">Enriched Messages</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="devices">0</div>
-                <div class="stat-label">Devices</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="last-raw">-</div>
-                <div class="stat-label">Last Raw Message</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="last-enriched">-</div>
-                <div class="stat-label">Last Enriched Message</div>
-            </div>
-            <div class="stat-card">
-                <div class="status-badge" id="kafka-status">Disconnected</div>
-                <div class="stat-label">Kafka Status</div>
+
+        <!-- Data Flow Diagram -->
+        <div class="data-flow-section">
+            <h3>📊 Data Flow Architecture</h3>
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div class="flow-icon">📱</div>
+                    <div class="flow-label">Smart Breaker</div>
+                    <div class="flow-description">Generates telemetry + trends</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-icon">📡</div>
+                    <div class="flow-label">iot.raw Topic</div>
+                    <div class="flow-description">Raw messages with device_type</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-icon">🔧</div>
+                    <div class="flow-label">Enrichment Service</div>
+                    <div class="flow-description">Device metadata + app registrations</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-icon">📊</div>
+                    <div class="flow-label">iot.enriched Topic</div>
+                    <div class="flow-description">Enriched with context</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-icon">🎯</div>
+                    <div class="flow-label">Applications</div>
+                    <div class="flow-description">Consume by device type</div>
+                </div>
             </div>
         </div>
-        
-        <div class="charts-grid">
+
+        <!-- Charts Section -->
+        <div class="charts-section">
             <div class="chart-card">
-                <h3>📊 Message Types Distribution</h3>
+                <h3>📈 Message Flow Over Time</h3>
                 <div class="chart-container">
-                    <canvas id="messageTypesChart"></canvas>
+                    <canvas id="messageFlowChart"></canvas>
                 </div>
             </div>
+
             <div class="chart-card">
-                <h3>📈 Message Rate (Last 10 minutes)</h3>
+                <h3>📱 Device Type Distribution</h3>
                 <div class="chart-container">
-                    <canvas id="messageRateChart"></canvas>
+                    <canvas id="deviceTypeChart"></canvas>
                 </div>
             </div>
         </div>
-        
-        <div class="data-tabs">
-            <div class="tab-buttons">
-                <button class="tab-button active" onclick="showTab('raw')">Raw Data</button>
-                <button class="tab-button" onclick="showTab('enriched')">Enriched Data</button>
-            </div>
-            
-            <div class="tab-content active" id="raw-tab">
-                <button class="refresh-btn" onclick="refreshMessages()">🔄 Refresh Messages</button>
-                <div class="message-list" id="raw-messages">
-                    <p>No raw messages received yet</p>
+
+        <!-- Application Registrations -->
+        <div class="data-flow-section">
+            <h3>📱 Application Registrations by Device Type</h3>
+            <div id="app-registrations-grid">
+                <div class="metric">
+                    <span class="metric-label">Loading application registrations...</span>
+                    <span class="metric-value">-</span>
                 </div>
             </div>
-            
-            <div class="tab-content" id="enriched-tab">
-                <button class="refresh-btn" onclick="refreshMessages()">🔄 Refresh Messages</button>
-                <div class="message-list" id="enriched-messages">
-                    <p>No enriched messages received yet</p>
-                </div>
+        </div>
+
+        <!-- Messages Section -->
+        <div class="messages-section">
+            <h3>💬 Recent Messages</h3>
+            <div class="message-tabs">
+                <button class="message-tab active" onclick="showTab('raw')">Raw Messages</button>
+                <button class="message-tab" onclick="showTab('enriched')">Enriched Messages</button>
+                <button class="message-tab" onclick="showTab('trends')">Trends Data</button>
+            </div>
+
+            <div id="raw-messages" class="message-content active">
+                <div id="raw-messages-container">Loading raw messages...</div>
+            </div>
+
+            <div id="enriched-messages" class="message-content">
+                <div id="enriched-messages-container">Loading enriched messages...</div>
+            </div>
+
+            <div id="trends-messages" class="message-content">
+                <div id="trends-messages-container">Loading trends data...</div>
             </div>
         </div>
     </div>
 
+    <button class="refresh-button" onclick="refreshData()" title="Refresh Data">🔄</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        let messageTypesChart, messageRateChart;
-        let messageRateData = [];
-        
+        let messageFlowChart, deviceTypeChart;
+        let lastUpdateTime = 0;
+        let messageCounts = { raw: 0, enriched: 0, trends: 0 };
+        let deviceTypeCounts = {};
+        let appRegistrations = {};
+
         // Initialize charts
         function initCharts() {
-            // Message Types Chart
-            const typesCtx = document.getElementById('messageTypesChart').getContext('2d');
-            messageTypesChart = new Chart(typesCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['telemetry'],
-                    datasets: [{
-                        data: [1],
-                        backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#f5576c'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-            
-            // Message Rate Chart
-            const rateCtx = document.getElementById('messageRateChart').getContext('2d');
-            messageRateChart = new Chart(rateCtx, {
+            const ctx1 = document.getElementById('messageFlowChart').getContext('2d');
+            const ctx2 = document.getElementById('deviceTypeChart').getContext('2d');
+
+            messageFlowChart = new Chart(ctx1, {
                 type: 'line',
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'Messages per minute',
+                        label: 'Raw Messages',
                         data: [],
                         borderColor: '#667eea',
                         backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        tension: 0.4,
-                        fill: true
+                        tension: 0.4
+                    }, {
+                        label: 'Enriched Messages',
+                        data: [],
+                        borderColor: '#27ae60',
+                        backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Trends Data',
+                        data: [],
+                        borderColor: '#f39c12',
+                        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                        tension: 0.4
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            }
-                        }
-                    },
+                    maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            display: false
+                        legend: { position: 'top' },
+                        title: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true },
+                        x: { 
+                            type: 'time',
+                            time: { unit: 'minute' }
                         }
                     }
                 }
             });
+
+            deviceTypeChart = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            '#667eea', '#27ae60', '#f39c12', '#e74c3c',
+                            '#9b59b6', '#1abc9c', '#34495e', '#f1c40f'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' },
+                        title: { display: false }
+                    }
+                }
+            });
         }
-        
-        // Show tab content
+
+        // Show message tab
         function showTab(tabName) {
-            // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(content => {
+            // Hide all content
+            document.querySelectorAll('.message-content').forEach(content => {
                 content.classList.remove('active');
             });
-            
-            // Remove active class from all buttons
-            document.querySelectorAll('.tab-button').forEach(button => {
-                button.classList.remove('active');
+            document.querySelectorAll('.message-tab').forEach(tab => {
+                tab.classList.remove('active');
             });
-            
-            // Show selected tab content
-            document.getElementById(tabName + '-tab').classList.add('active');
-            
-            // Add active class to clicked button
+
+            // Show selected content and activate tab
+            document.getElementById(tabName + '-messages').classList.add('active');
             event.target.classList.add('active');
         }
-        
+
+        // Toggle message details
+        function toggleDetails(button) {
+            const details = button.nextElementSibling;
+            if (details.style.display === 'none' || details.style.display === '') {
+                details.style.display = 'block';
+                button.textContent = 'Hide Details';
+            } else {
+                details.style.display = 'none';
+                button.textContent = 'Show Details';
+            }
+        }
+
         // Format timestamp
         function formatTimestamp(timestamp) {
-            if (!timestamp) return '-';
+            if (!timestamp) return 'N/A';
             const date = new Date(timestamp);
-            return date.toLocaleTimeString();
-        }
-        
-        // Format time ago
-        function formatTimeAgo(seconds) {
-            if (seconds === null || seconds === undefined) return '-';
-            if (seconds < 60) return `${seconds}s ago`;
-            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-            return `${Math.floor(seconds / 3600)}h ago`;
-        }
-        
-        // Update dashboard with new data
-        function updateDashboard(data) {
-            // Update stats
-            document.getElementById('total-raw').textContent = data.stats.total_raw_messages;
-            document.getElementById('total-enriched').textContent = data.stats.total_enriched_messages;
-            document.getElementById('devices').textContent = data.stats.devices_seen.length;
-            document.getElementById('last-raw').textContent = formatTimeAgo(data.stats.last_raw_message_ago);
-            document.getElementById('last-enriched').textContent = formatTimeAgo(data.stats.last_enriched_message_ago);
-            
-            // Update Kafka status
-            const statusElement = document.getElementById('kafka-status');
-            if (data.stats.kafka_connected) {
-                statusElement.textContent = 'Connected';
-                statusElement.className = 'status-badge status-connected';
-            } else {
-                statusElement.textContent = 'Disconnected';
-                statusElement.className = 'status-badge status-disconnected';
-            }
-            
-            // Update message types chart
-            const messageTypes = data.stats.message_types;
-            const labels = Object.keys(messageTypes);
-            const values = Object.values(messageTypes);
-            
-            messageTypesChart.data.labels = labels;
-            messageTypesChart.data.datasets[0].data = values;
-            messageTypesChart.update();
-            
-            // Update message rate chart
             const now = new Date();
-            const currentMinute = now.getMinutes();
+            const diff = now - date;
             
-            // Add current minute if not exists
-            if (!messageRateData.find(d => d.minute === currentMinute)) {
-                messageRateData.push({
-                    minute: currentMinute,
-                    count: data.stats.total_raw_messages + data.stats.total_enriched_messages
-                });
-                
-                // Keep only last 10 minutes
-                if (messageRateData.length > 10) {
-                    messageRateData.shift();
-                }
-            }
-            
-            const rateLabels = messageRateData.map(d => `${now.getHours()}:${d.minute.toString().padStart(2, '0')}`);
-            const rateValues = messageRateData.map(d => d.count);
-            
-            messageRateChart.data.labels = rateLabels;
-            messageRateChart.data.datasets[0].data = rateValues;
-            messageRateChart.update();
+            if (diff < 60000) return 'Just now';
+            if (diff < 3600000) return Math.floor(diff / 60000) + ' minutes ago';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + ' hours ago';
+            return date.toLocaleString();
         }
-        
-        // Toggle message details visibility
-        function toggleDetails(button) {
-            const detailsDiv = button.nextElementSibling;
-            const isVisible = detailsDiv.classList.contains('show');
-            
-            if (isVisible) {
-                detailsDiv.classList.remove('show');
-                button.textContent = 'Show Details';
+
+        // Update status indicators
+        function updateStatusIndicators() {
+            // Kafka status
+            const kafkaStatus = document.getElementById('kafka-status');
+            const kafkaConnection = document.getElementById('kafka-connection');
+            if (messageCounts.raw > 0 || messageCounts.enriched > 0) {
+                kafkaStatus.className = 'status-indicator status-healthy';
+                kafkaConnection.textContent = 'Connected';
+                kafkaConnection.className = 'metric-value success';
             } else {
-                detailsDiv.classList.add('show');
-                button.textContent = 'Hide Details';
+                kafkaStatus.className = 'status-indicator status-warning';
+                kafkaConnection.textContent = 'No Data';
+                kafkaConnection.className = 'metric-value warning';
+            }
+
+            // Simulator status
+            const simulatorStatus = document.getElementById('simulator-status');
+            if (messageCounts.raw > 0) {
+                simulatorStatus.className = 'status-indicator status-healthy';
+            } else {
+                simulatorStatus.className = 'status-indicator status-error';
+            }
+
+            // Enrichment status
+            const enrichmentStatus = document.getElementById('enrichment-status');
+            if (messageCounts.enriched > 0) {
+                enrichmentStatus.className = 'status-indicator status-healthy';
+            } else {
+                enrichmentStatus.className = 'status-indicator status-warning';
+            }
+
+            // App registry status
+            const appRegistryStatus = document.getElementById('app-registry-status');
+            if (Object.keys(appRegistrations).length > 0) {
+                appRegistryStatus.className = 'status-indicator status-healthy';
+            } else {
+                appRegistryStatus.className = 'status-indicator status-warning';
             }
         }
-        
+
+        // Update metrics
+        function updateMetrics() {
+            // Kafka metrics
+            document.getElementById('kafka-topics').textContent = '2 (iot.raw, iot.enriched)';
+            document.getElementById('kafka-throughput').textContent = 
+                Math.round((messageCounts.raw + messageCounts.enriched) / 60) + '/min';
+
+            // Simulator metrics
+            document.getElementById('simulator-device').textContent = 'breaker-001';
+            document.getElementById('simulator-rate').textContent = '~12/min';
+            document.getElementById('simulator-activity').textContent = 
+                messageCounts.raw > 0 ? 'Active' : 'Inactive';
+
+            // Enrichment metrics
+            document.getElementById('enrichment-status-text').textContent = 
+                messageCounts.enriched > 0 ? 'Processing' : 'Waiting';
+            document.getElementById('enrichment-processed').textContent = messageCounts.enriched;
+            document.getElementById('enrichment-queries').textContent = 
+                Object.keys(appRegistrations).length;
+
+            // App registry metrics
+            document.getElementById('app-registry-status-text').textContent = 
+                Object.keys(appRegistrations).length > 0 ? 'Available' : 'Checking';
+            document.getElementById('app-registry-count').textContent = 
+                Object.values(appRegistrations).reduce((sum, apps) => sum + apps.length, 0);
+            document.getElementById('app-registry-device-types').textContent = 
+                Object.keys(appRegistrations).length;
+        }
+
+        // Update application registrations display
+        function updateAppRegistrations() {
+            const container = document.getElementById('app-registrations-grid');
+            
+            if (Object.keys(appRegistrations).length === 0) {
+                container.innerHTML = '<div class="metric"><span class="metric-label">No applications registered yet</span><span class="metric-value">-</span></div>';
+                return;
+            }
+
+            let html = '';
+            for (const [deviceType, apps] of Object.entries(appRegistrations)) {
+                html += `
+                    <div class="status-card" style="margin-bottom: 15px;">
+                        <h3>📱 ${deviceType.replace('_', ' ').toUpperCase()}</h3>
+                        <div class="metric">
+                            <span class="metric-label">Applications</span>
+                            <span class="metric-value">${apps.length}</span>
+                        </div>
+                        ${apps.map(app => `
+                            <div class="metric">
+                                <span class="metric-label">${app.name}</span>
+                                <span class="metric-value">${app.platform} - ${app.category}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        // Update charts
+        function updateCharts() {
+            const now = new Date();
+            const timeLabel = now.toLocaleTimeString();
+
+            // Update message flow chart
+            messageFlowChart.data.labels.push(timeLabel);
+            messageFlowChart.data.datasets[0].data.push(messageCounts.raw);
+            messageFlowChart.data.datasets[1].data.push(messageCounts.enriched);
+            messageFlowChart.data.datasets[2].data.push(messageCounts.trends);
+
+            // Keep only last 20 data points
+            if (messageFlowChart.data.labels.length > 20) {
+                messageFlowChart.data.labels.shift();
+                messageFlowChart.data.datasets.forEach(dataset => dataset.data.shift());
+            }
+
+            messageFlowChart.update();
+
+            // Update device type chart
+            deviceTypeChart.data.labels = Object.keys(deviceTypeCounts);
+            deviceTypeChart.data.datasets[0].data = Object.values(deviceTypeCounts);
+            deviceTypeChart.update();
+        }
+
+        // Fetch and display messages
+        async function fetchMessages() {
+            try {
+                const response = await fetch('/api/messages');
+                const data = await response.json();
+                
+                // Update message counts
+                messageCounts.raw = data.raw_messages.length;
+                messageCounts.enriched = data.enriched_messages.length;
+                messageCounts.trends = data.enriched_messages.filter(m => 
+                    m._kafka_info?.message_type === 'trends'
+                ).length;
+
+                // Update device type counts
+                deviceTypeCounts = {};
+                data.enriched_messages.forEach(msg => {
+                    const deviceType = msg.device_type || 'unknown';
+                    deviceTypeCounts[deviceType] = (deviceTypeCounts[deviceType] || 0) + 1;
+                });
+
+                // Display messages
+                displayMessages(data.raw_messages, 'raw-messages-container', 'Raw');
+                displayMessages(data.enriched_messages, 'enriched-messages-container', 'Enriched');
+                
+                // Display trends separately
+                const trendsMessages = data.enriched_messages.filter(m => 
+                    m._kafka_info?.message_type === 'trends'
+                );
+                displayMessages(trendsMessages, 'trends-messages-container', 'Trends');
+
+                // Update all displays
+                updateStatusIndicators();
+                updateMetrics();
+                updateCharts();
+
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+            }
+        }
+
         // Display messages
         function displayMessages(messages, containerId, messageType) {
             const container = document.getElementById(containerId);
             
             if (messages.length === 0) {
-                container.innerHTML = `<p>No ${messageType} messages received yet</p>`;
+                container.innerHTML = `<div class="message-item"><div class="message-header"><span class="message-type">${messageType}</span><span class="message-timestamp">No messages</span></div><div class="message-summary">No ${messageType.toLowerCase()} messages available</div></div>`;
                 return;
             }
-            
-            container.innerHTML = messages.map(msg => {
-                const summary = JSON.stringify(msg, null, 2).substring(0, 200) + '...';
+
+            const recentMessages = messages.slice(-5); // Show last 5 messages
+            container.innerHTML = recentMessages.map(msg => {
+                const timestamp = formatTimestamp(msg.timestamp);
+                const deviceId = msg.device_id || 'N/A';
+                const deviceType = msg.device_type || 'N/A';
+                
+                let summary = '';
+                if (msg._kafka_info?.message_type === 'trends') {
+                    summary = `Trends: ${msg.trends?.length || 0} data points`;
+                } else if (msg.measurements) {
+                    summary = `Measurements: ${Object.keys(msg.measurements).length} types`;
+                } else {
+                    summary = 'No measurements data';
+                }
+
                 const details = JSON.stringify(msg, null, 2);
+
                 return `
                     <div class="message-item">
                         <div class="message-header">
-                            <span class="message-type">${msg._kafka_info?.message_type || messageType}</span>
-                            <span class="message-timestamp">${formatTimestamp(msg.timestamp)}</span>
+                            <span class="message-type">${messageType}</span>
+                            <span class="message-timestamp">${timestamp}</span>
                         </div>
                         <div class="message-summary">
                             <h4>Summary</h4>
                             <div class="summary-grid">
                                 <div class="summary-item">
-                                    <span class="summary-label">Message Type:</span>
-                                    <span class="summary-value">${msg._kafka_info?.message_type || messageType}</span>
-                                </div>
-                                <div class="summary-item">
-                                    <span class="summary-label">Timestamp:</span>
-                                    <span class="summary-value">${formatTimestamp(msg.timestamp)}</span>
-                                </div>
-                                <div class="summary-item">
                                     <span class="summary-label">Device ID:</span>
-                                    <span class="summary-value">${msg.device_id || 'N/A'}</span>
+                                    <span class="summary-value">${deviceId}</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">Device Type:</span>
+                                    <span class="summary-value">${deviceType}</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">Content:</span>
+                                    <span class="summary-value">${summary}</span>
                                 </div>
                             </div>
                         </div>
                         <button class="toggle-details" onclick="toggleDetails(this)">Show Details</button>
-                        <div class="message-details" data-details='${JSON.stringify(msg, null, 2)}'>
+                        <div class="message-details" style="display: none;">
                             <pre>${details}</pre>
                         </div>
                     </div>
                 `;
             }).join('');
         }
-        
-        // Refresh messages from API
-        function refreshMessages() {
-            axios.get('/api/messages')
-                .then(response => {
-                    if (response.data.success) {
-                        updateDashboard(response.data);
-                        displayMessages(response.data.raw_messages, 'raw-messages', 'raw');
-                        displayMessages(response.data.enriched_messages, 'enriched-messages', 'enriched');
+
+        // Fetch application registrations
+        async function fetchAppRegistrations() {
+            try {
+                const deviceTypes = ['smart_breaker', 'smart_meter', 'environmental_sensor'];
+                
+                for (const deviceType of deviceTypes) {
+                    try {
+                        const response = await fetch(`http://localhost:5002/api/applications/by-device-type/${deviceType}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            appRegistrations[deviceType] = data.applications;
+                        }
+                    } catch (error) {
+                        console.log(`No app registry service available for ${deviceType}`);
                     }
-                })
-                .catch(error => {
-                    console.error('Error fetching messages:', error);
-                });
+                }
+                
+                updateAppRegistrations();
+            } catch (error) {
+                console.log('App registry service not available');
+            }
         }
-        
-        // Update stats periodically
-        function updateStats() {
-            axios.get('/api/stats')
-                .then(response => {
-                    if (response.data.success) {
-                        updateDashboard(response.data);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching stats:', error);
-                });
+
+        // Refresh all data
+        function refreshData() {
+            fetchMessages();
+            fetchAppRegistrations();
         }
-        
+
         // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', function() {
+        function initDashboard() {
             initCharts();
+            fetchMessages();
+            fetchAppRegistrations();
             
-            // Initial load
-            refreshMessages();
+            // Auto-refresh every 5 seconds
+            setInterval(fetchMessages, 5000);
             
-            // Update every 5 seconds
-            setInterval(updateStats, 5000);
-            
-            // Refresh messages every 10 seconds
-            setInterval(refreshMessages, 10000);
-        });
+            // Refresh app registrations every 30 seconds
+            setInterval(fetchAppRegistrations, 30000);
+        }
+
+        // Start dashboard when page loads
+        document.addEventListener('DOMContentLoaded', initDashboard);
     </script>
 </body>
 </html>

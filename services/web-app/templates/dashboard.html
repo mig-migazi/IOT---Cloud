@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IoT Cloud Platform Dashboard</title>
+    <title>IoT Cloud Command Center</title>
     <style>
         * {
             margin: 0;
@@ -13,36 +13,87 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e0e0e0;
             min-height: 100vh;
+            overflow-x: hidden;
         }
 
+        /* Animated background particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #00d4ff;
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0; }
+            50% { transform: translateY(-20px) rotate(180deg); opacity: 1; }
+        }
+
+        /* Header with neon effect */
         .header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 2px solid #00d4ff;
+            padding: 20px 0;
             text-align: center;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.2), transparent);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
         }
 
         .header h1 {
-            color: #2c3e50;
-            font-size: 2.5em;
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
             margin-bottom: 10px;
         }
 
         .header p {
-            color: #7f8c8d;
-            font-size: 1.1em;
+            color: #888;
+            font-size: 1.1rem;
         }
 
+        /* Main container with glassmorphism */
         .container {
             max-width: 1400px;
-            margin: 20px auto;
-            padding: 0 20px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
         }
 
+        /* Status grid with circuit board aesthetic */
         .status-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -51,18 +102,43 @@
         }
 
         .status-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.3);
             border-radius: 15px;
             padding: 25px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .status-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00d4ff, #ff0080, #00d4ff);
+            background-size: 200% 100%;
+            animation: gradient-flow 2s linear infinite;
+        }
+
+        @keyframes gradient-flow {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .status-card:hover {
+            transform: translateY(-5px);
+            border-color: #00d4ff;
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
         }
 
         .status-card h3 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 1.3em;
+            color: #00d4ff;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -73,166 +149,196 @@
             height: 12px;
             border-radius: 50%;
             display: inline-block;
+            animation: pulse 2s ease-in-out infinite;
         }
 
-        .status-healthy { background: #27ae60; }
-        .status-warning { background: #f39c12; }
-        .status-error { background: #e74c3c; }
+        .status-healthy {
+            background: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .status-warning {
+            background: #ffaa00;
+            box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+        }
+
+        .status-error {
+            background: #ff0066;
+            box-shadow: 0 0 10px rgba(255, 0, 102, 0.5);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
 
         .metric {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
-            padding: 8px 0;
-            border-bottom: 1px solid #ecf0f1;
-        }
-
-        .metric:last-child {
-            border-bottom: none;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
         }
 
         .metric-label {
-            font-weight: 500;
-            color: #7f8c8d;
+            color: #aaa;
+            font-size: 0.9rem;
         }
 
         .metric-value {
+            color: #00d4ff;
             font-weight: 600;
-            color: #2c3e50;
-            font-size: 1.1em;
+            font-size: 1.1rem;
         }
 
-        .metric-value.success { color: #27ae60; }
-        .metric-value.warning { color: #f39c12; }
-        .metric-value.error { color: #e74c3c; }
-
+        /* Data flow section with circuit design */
         .data-flow-section {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 25px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 20px;
+            padding: 30px;
             margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            position: relative;
         }
 
         .data-flow-section h3 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-size: 1.5em;
+            color: #00d4ff;
+            font-size: 1.5rem;
+            margin-bottom: 25px;
+            text-align: center;
         }
 
         .flow-diagram {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin: 20px 0;
-            flex-wrap: wrap;
+            justify-content: center;
             gap: 20px;
+            flex-wrap: wrap;
         }
 
         .flow-step {
             text-align: center;
-            flex: 1;
+            padding: 20px;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 15px;
             min-width: 150px;
+            transition: all 0.3s ease;
+        }
+
+        .flow-step:hover {
+            background: rgba(0, 212, 255, 0.2);
+            transform: scale(1.05);
         }
 
         .flow-icon {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 10px;
-            color: white;
-            font-size: 24px;
-        }
-
-        .flow-arrow {
-            font-size: 24px;
-            color: #7f8c8d;
+            font-size: 2rem;
+            margin-bottom: 10px;
         }
 
         .flow-label {
+            color: #00d4ff;
             font-weight: 600;
-            color: #2c3e50;
             margin-bottom: 5px;
         }
 
         .flow-description {
-            font-size: 0.9em;
-            color: #7f8c8d;
+            color: #888;
+            font-size: 0.8rem;
         }
 
+        .flow-arrow {
+            font-size: 2rem;
+            color: #00d4ff;
+            animation: flow-pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes flow-pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* Charts with dark theme */
         .charts-section {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
+            gap: 25px;
             margin-bottom: 30px;
         }
 
         .chart-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.3);
             border-radius: 15px;
             padding: 25px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            height: 400px;
+            transition: all 0.3s ease;
+        }
+
+        .chart-card:hover {
+            border-color: #00d4ff;
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.1);
         }
 
         .chart-card h3 {
-            color: #2c3e50;
+            color: #00d4ff;
+            font-size: 1.3rem;
             margin-bottom: 20px;
-            font-size: 1.3em;
+            text-align: center;
         }
 
         .chart-container {
+            height: 300px;
             position: relative;
-            height: 320px;
-            width: 100%;
         }
 
+        /* Messages section with terminal aesthetic */
         .messages-section {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 25px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 20px;
+            padding: 30px;
             margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
 
         .messages-section h3 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-size: 1.5em;
+            color: #00d4ff;
+            font-size: 1.5rem;
+            margin-bottom: 25px;
+            text-align: center;
         }
 
         .message-tabs {
             display: flex;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ecf0f1;
+            gap: 10px;
+            margin-bottom: 25px;
+            justify-content: center;
         }
 
         .message-tab {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
             padding: 12px 24px;
-            background: none;
-            border: none;
+            border-radius: 25px;
             cursor: pointer;
-            font-size: 1em;
-            color: #7f8c8d;
-            border-bottom: 2px solid transparent;
             transition: all 0.3s ease;
-        }
-
-        .message-tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
+            font-size: 0.9rem;
         }
 
         .message-tab:hover {
-            color: #667eea;
+            background: rgba(0, 212, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .message-tab.active {
+            background: #00d4ff;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
         }
 
         .message-content {
@@ -244,119 +350,148 @@
         }
 
         .message-item {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 10px;
+            padding: 20px;
             margin-bottom: 15px;
-            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .message-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(0, 212, 255, 0.4);
         }
 
         .message-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
         }
 
         .message-type {
-            background: #667eea;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.9em;
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
             font-weight: 600;
         }
 
         .message-timestamp {
-            color: #7f8c8d;
-            font-size: 0.9em;
-        }
-
-        .message-summary {
-            margin-bottom: 15px;
+            color: #888;
+            font-size: 0.9rem;
         }
 
         .message-summary h4 {
-            color: #2c3e50;
-            margin-bottom: 10px;
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
         }
 
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
+            margin-bottom: 20px;
         }
 
         .summary-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #ecf0f1;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 212, 255, 0.1);
         }
 
         .summary-label {
-            font-weight: 500;
-            color: #7f8c8d;
+            color: #aaa;
+            font-size: 0.8rem;
+            display: block;
+            margin-bottom: 5px;
         }
 
         .summary-value {
+            color: #00d4ff;
             font-weight: 600;
-            color: #2c3e50;
         }
 
         .toggle-details {
-            background: #667eea;
-            color: white;
-            border: none;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
             padding: 8px 16px;
-            border-radius: 6px;
+            border-radius: 20px;
             cursor: pointer;
-            font-size: 0.9em;
-            transition: background 0.3s ease;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
         }
 
         .toggle-details:hover {
-            background: #5a6fd8;
+            background: rgba(0, 212, 255, 0.2);
+            transform: translateY(-1px);
         }
 
         .message-details {
-            display: none;
             margin-top: 15px;
-            background: #2c3e50;
-            color: #ecf0f1;
             padding: 15px;
-            border-radius: 6px;
-            overflow-x: auto;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
         }
 
         .message-details pre {
-            margin: 0;
+            color: #00d4ff;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            overflow-x: auto;
             white-space: pre-wrap;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.85em;
         }
 
+        /* Refresh button with neon effect */
         .refresh-button {
             position: fixed;
             bottom: 30px;
             right: 30px;
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 15px;
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 212, 255, 0.2);
+            border: 2px solid #00d4ff;
             border-radius: 50%;
+            color: #00d4ff;
+            font-size: 1.5rem;
             cursor: pointer;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
             transition: all 0.3s ease;
-            font-size: 20px;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
         }
 
         .refresh-button:hover {
-            background: #5a6fd8;
+            background: rgba(0, 212, 255, 0.3);
             transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
         }
 
+        /* Responsive design */
         @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            
             .flow-diagram {
                 flex-direction: column;
             }
@@ -364,17 +499,34 @@
             .flow-arrow {
                 transform: rotate(90deg);
             }
-            
-            .charts-section {
-                grid-template-columns: 1fr;
-            }
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 212, 255, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 212, 255, 0.7);
         }
     </style>
 </head>
 <body>
+    <!-- Animated background particles -->
+    <div class="particles" id="particles"></div>
+
     <div class="header">
-        <h1>🚀 IoT Cloud Platform Dashboard</h1>
-        <p>Real-time monitoring of data flow, device types, and application registrations</p>
+        <h1>⚡ IoT Cloud Command Center</h1>
+        <p>Real-time monitoring & control of distributed IoT infrastructure</p>
     </div>
 
     <div class="container">
@@ -383,26 +535,26 @@
             <div class="status-card">
                 <h3>
                     <span class="status-indicator" id="kafka-status"></span>
-                    Kafka/RedPanda Status
+                    🚀 Kafka/RedPanda Status
                 </h3>
                 <div class="metric">
-                    <span class="metric-label">Connection</span>
-                    <span class="metric-value" id="kafka-connection">Checking...</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Topics</span>
+                    <span class="metric-label">Topics Active</span>
                     <span class="metric-value" id="kafka-topics">-</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">Messages/sec</span>
+                    <span class="metric-label">Throughput</span>
                     <span class="metric-value" id="kafka-throughput">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Connection</span>
+                    <span class="metric-value" id="kafka-connection">-</span>
                 </div>
             </div>
 
             <div class="status-card">
                 <h3>
                     <span class="status-indicator" id="simulator-status"></span>
-                    Simulator Status
+                    📱 Simulator Status
                 </h3>
                 <div class="metric">
                     <span class="metric-label">Device ID</span>
@@ -421,7 +573,7 @@
             <div class="status-card">
                 <h3>
                     <span class="status-indicator" id="enrichment-status"></span>
-                    Enrichment Service
+                    🔧 Enrichment Service
                 </h3>
                 <div class="metric">
                     <span class="metric-label">Status</span>
@@ -440,7 +592,7 @@
             <div class="status-card">
                 <h3>
                     <span class="status-indicator" id="app-registry-status"></span>
-                    App Registry Service
+                    📋 App Registry Service
                 </h3>
                 <div class="metric">
                     <span class="metric-label">Status</span>
@@ -457,42 +609,9 @@
             </div>
         </div>
 
-        <!-- Data Flow Diagram -->
-        <div class="data-flow-section">
-            <h3>📊 Data Flow Architecture</h3>
-            <div class="flow-diagram">
-                <div class="flow-step">
-                    <div class="flow-icon">📱</div>
-                    <div class="flow-label">Smart Breaker</div>
-                    <div class="flow-description">Generates telemetry + trends</div>
-                </div>
-                <div class="flow-arrow">→</div>
-                <div class="flow-step">
-                    <div class="flow-icon">📡</div>
-                    <div class="flow-label">iot.raw Topic</div>
-                    <div class="flow-description">Raw messages with device_type</div>
-                </div>
-                <div class="flow-arrow">→</div>
-                <div class="flow-step">
-                    <div class="flow-icon">🔧</div>
-                    <div class="flow-label">Enrichment Service</div>
-                    <div class="flow-description">Device metadata + app registrations</div>
-                </div>
-                <div class="flow-arrow">→</div>
-                <div class="flow-step">
-                    <div class="flow-icon">📊</div>
-                    <div class="flow-label">iot.enriched Topic</div>
-                    <div class="flow-description">Enriched with context</div>
-                </div>
-                <div class="flow-arrow">→</div>
-                <div class="flow-step">
-                    <div class="flow-icon">🎯</div>
-                    <div class="flow-label">Applications</div>
-                    <div class="flow-description">Consume by device type</div>
-                </div>
-            </div>
-        </div>
-
+        <!-- Data Flow Architecture -->
+        <!-- Removed to reduce visual clutter -->
+        
         <!-- Charts Section -->
         <div class="charts-section">
             <div class="chart-card">
@@ -501,7 +620,6 @@
                     <canvas id="messageFlowChart"></canvas>
                 </div>
             </div>
-
             <div class="chart-card">
                 <h3>📱 Device Type Distribution</h3>
                 <div class="chart-container">
@@ -514,10 +632,7 @@
         <div class="data-flow-section">
             <h3>📱 Application Registrations by Device Type</h3>
             <div id="app-registrations-grid">
-                <div class="metric">
-                    <span class="metric-label">Loading application registrations...</span>
-                    <span class="metric-value">-</span>
-                </div>
+                <!-- Dynamic content -->
             </div>
         </div>
 
@@ -529,17 +644,20 @@
                 <button class="message-tab" onclick="showTab('enriched')">Enriched Messages</button>
                 <button class="message-tab" onclick="showTab('trends')">Trends Data</button>
             </div>
-
             <div id="raw-messages" class="message-content active">
-                <div id="raw-messages-container">Loading raw messages...</div>
+                <div id="raw-messages-container">
+                    <!-- Raw messages will be displayed here -->
+                </div>
             </div>
-
             <div id="enriched-messages" class="message-content">
-                <div id="enriched-messages-container">Loading enriched messages...</div>
+                <div id="enriched-messages-container">
+                    <!-- Enriched messages will be displayed here -->
+                </div>
             </div>
-
             <div id="trends-messages" class="message-content">
-                <div id="trends-messages-container">Loading trends data...</div>
+                <div id="trends-messages-container">
+                    <!-- Trends messages will be displayed here -->
+                </div>
             </div>
         </div>
     </div>
@@ -548,100 +666,134 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // Global variables
         let messageFlowChart, deviceTypeChart;
-        let lastUpdateTime = 0;
         let messageCounts = { raw: 0, enriched: 0, trends: 0 };
         let deviceTypeCounts = {};
         let appRegistrations = {};
 
-        // Initialize charts
-        function initCharts() {
-            const ctx1 = document.getElementById('messageFlowChart').getContext('2d');
-            const ctx2 = document.getElementById('deviceTypeChart').getContext('2d');
+        // Create animated background particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 6 + 's';
+                particle.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
 
-            messageFlowChart = new Chart(ctx1, {
+        // Initialize charts with dark theme
+        function initCharts() {
+            // Message Flow Chart
+            const messageFlowCtx = document.getElementById('messageFlowChart').getContext('2d');
+            messageFlowChart = new Chart(messageFlowCtx, {
                 type: 'line',
                 data: {
                     labels: [],
-                    datasets: [{
-                        label: 'Raw Messages',
-                        data: [],
-                        borderColor: '#667eea',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        tension: 0.4
-                    }, {
-                        label: 'Enriched Messages',
-                        data: [],
-                        borderColor: '#27ae60',
-                        backgroundColor: 'rgba(39, 174, 96, 0.1)',
-                        tension: 0.4
-                    }, {
-                        label: 'Trends Data',
-                        data: [],
-                        borderColor: '#f39c12',
-                        backgroundColor: 'rgba(243, 156, 18, 0.1)',
-                        tension: 0.4
-                    }]
+                    datasets: [
+                        {
+                            label: 'Raw Messages',
+                            data: [],
+                            borderColor: '#00d4ff',
+                            backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Enriched Messages',
+                            data: [],
+                            borderColor: '#ff0080',
+                            backgroundColor: 'rgba(255, 0, 128, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Trends Data',
+                            data: [],
+                            borderColor: '#00ff88',
+                            backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'top' },
-                        title: { display: false }
+                        legend: {
+                            labels: {
+                                color: '#e0e0e0'
+                            }
+                        }
                     },
                     scales: {
-                        y: { beginAtZero: true },
-                        x: { 
-                            type: 'time',
-                            time: { unit: 'minute' }
+                        x: {
+                            ticks: { color: '#888' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        y: {
+                            ticks: { color: '#888' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
                         }
                     }
                 }
             });
 
-            deviceTypeChart = new Chart(ctx2, {
+            // Device Type Chart
+            const deviceTypeCtx = document.getElementById('deviceTypeChart').getContext('2d');
+            deviceTypeChart = new Chart(deviceTypeCtx, {
                 type: 'doughnut',
                 data: {
                     labels: [],
                     datasets: [{
                         data: [],
                         backgroundColor: [
-                            '#667eea', '#27ae60', '#f39c12', '#e74c3c',
-                            '#9b59b6', '#1abc9c', '#34495e', '#f1c40f'
-                        ]
+                            '#00d4ff',
+                            '#ff0080',
+                            '#00ff88',
+                            '#ffaa00',
+                            '#ff0066'
+                        ],
+                        borderWidth: 0
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'right' },
-                        title: { display: false }
+                        legend: {
+                            labels: {
+                                color: '#e0e0e0'
+                            }
+                        }
                     }
                 }
             });
         }
 
-        // Show message tab
+        // Show tab content
         function showTab(tabName) {
-            // Hide all content
-            document.querySelectorAll('.message-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.querySelectorAll('.message-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-
-            // Show selected content and activate tab
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.message-content');
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.message-tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Show selected tab content
             document.getElementById(tabName + '-messages').classList.add('active');
+            
+            // Add active class to clicked tab
             event.target.classList.add('active');
         }
 
         // Toggle message details
         function toggleDetails(button) {
             const details = button.nextElementSibling;
-            if (details.style.display === 'none' || details.style.display === '') {
+            if (details.style.display === 'none') {
                 details.style.display = 'block';
                 button.textContent = 'Hide Details';
             } else {
@@ -653,33 +805,29 @@
         // Format timestamp
         function formatTimestamp(timestamp) {
             if (!timestamp) return 'N/A';
-            const date = new Date(timestamp);
-            const now = new Date();
-            const diff = now - date;
-            
-            if (diff < 60000) return 'Just now';
-            if (diff < 3600000) return Math.floor(diff / 60000) + ' minutes ago';
-            if (diff < 86400000) return Math.floor(diff / 3600000) + ' hours ago';
-            return date.toLocaleString();
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleString();
+            } catch (e) {
+                return timestamp;
+            }
         }
 
         // Update status indicators
         function updateStatusIndicators() {
-            // Kafka status
             const kafkaStatus = document.getElementById('kafka-status');
-            const kafkaConnection = document.getElementById('kafka-connection');
+            const simulatorStatus = document.getElementById('simulator-status');
+            const enrichmentStatus = document.getElementById('enrichment-status');
+            const appRegistryStatus = document.getElementById('app-registry-status');
+
+            // Kafka status
             if (messageCounts.raw > 0 || messageCounts.enriched > 0) {
                 kafkaStatus.className = 'status-indicator status-healthy';
-                kafkaConnection.textContent = 'Connected';
-                kafkaConnection.className = 'metric-value success';
             } else {
                 kafkaStatus.className = 'status-indicator status-warning';
-                kafkaConnection.textContent = 'No Data';
-                kafkaConnection.className = 'metric-value warning';
             }
 
             // Simulator status
-            const simulatorStatus = document.getElementById('simulator-status');
             if (messageCounts.raw > 0) {
                 simulatorStatus.className = 'status-indicator status-healthy';
             } else {
@@ -687,7 +835,6 @@
             }
 
             // Enrichment status
-            const enrichmentStatus = document.getElementById('enrichment-status');
             if (messageCounts.enriched > 0) {
                 enrichmentStatus.className = 'status-indicator status-healthy';
             } else {
@@ -695,7 +842,6 @@
             }
 
             // App registry status
-            const appRegistryStatus = document.getElementById('app-registry-status');
             if (Object.keys(appRegistrations).length > 0) {
                 appRegistryStatus.className = 'status-indicator status-healthy';
             } else {
@@ -827,7 +973,7 @@
             }
         }
 
-        // Display messages
+        // Display messages with state preservation
         function displayMessages(messages, containerId, messageType) {
             const container = document.getElementById(containerId);
             
@@ -837,7 +983,19 @@
             }
 
             const recentMessages = messages.slice(-5); // Show last 5 messages
-            container.innerHTML = recentMessages.map(msg => {
+            
+            // Track which messages are currently expanded
+            const expandedMessages = new Set();
+            const existingButtons = container.querySelectorAll('.toggle-details');
+            existingButtons.forEach((button, index) => {
+                const details = button.nextElementSibling;
+                if (details && details.style.display !== 'none') {
+                    expandedMessages.add(index);
+                }
+            });
+
+            // Update messages while preserving expanded state
+            recentMessages.forEach((msg, index) => {
                 const timestamp = formatTimestamp(msg.timestamp);
                 const deviceId = msg.device_id || 'N/A';
                 const deviceType = msg.device_type || 'N/A';
@@ -852,37 +1010,75 @@
                 }
 
                 const details = JSON.stringify(msg, null, 2);
+                const isExpanded = expandedMessages.has(index);
 
-                return `
-                    <div class="message-item">
-                        <div class="message-header">
-                            <span class="message-type">${messageType}</span>
-                            <span class="message-timestamp">${timestamp}</span>
-                        </div>
-                        <div class="message-summary">
-                            <h4>Summary</h4>
-                            <div class="summary-grid">
-                                <div class="summary-item">
-                                    <span class="summary-label">Device ID:</span>
-                                    <span class="summary-value">${deviceId}</span>
-                                </div>
-                                <div class="summary-item">
-                                    <span class="summary-label">Device Type:</span>
-                                    <span class="summary-value">${deviceType}</span>
-                                </div>
-                                <div class="summary-item">
-                                    <span class="summary-label">Content:</span>
-                                    <span class="summary-value">${summary}</span>
-                                </div>
+                // Create or update message item
+                let messageItem = container.children[index];
+                const isNewMessage = !messageItem || !messageItem.classList.contains('message-item');
+                
+                if (isNewMessage) {
+                    // Create new message item
+                    messageItem = document.createElement('div');
+                    messageItem.className = 'message-item';
+                    messageItem.style.opacity = '0';
+                    messageItem.style.transform = 'translateY(-10px)';
+                    container.appendChild(messageItem);
+                }
+
+                // Update content without destroying expanded state
+                messageItem.innerHTML = `
+                    <div class="message-header">
+                        <span class="message-type">${messageType}</span>
+                        <span class="message-timestamp">${timestamp}</span>
+                        ${isNewMessage ? '<span class="new-message-indicator">🆕</span>' : ''}
+                    </div>
+                    <div class="message-summary">
+                        <h4>Summary</h4>
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <span class="summary-label">Device ID:</span>
+                                <span class="summary-value">${deviceId}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Device Type:</span>
+                                <span class="summary-value">${deviceType}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Content:</span>
+                                <span class="summary-value">${summary}</span>
                             </div>
                         </div>
-                        <button class="toggle-details" onclick="toggleDetails(this)">Show Details</button>
-                        <div class="message-details" style="display: none;">
-                            <pre>${details}</pre>
-                        </div>
+                    </div>
+                    <button class="toggle-details" onclick="toggleDetails(this)">${isExpanded ? 'Hide Details' : 'Show Details'}</button>
+                    <div class="message-details" style="display: ${isExpanded ? 'block' : 'none'};">
+                        <pre>${details}</pre>
                     </div>
                 `;
-            }).join('');
+
+                // Animate new messages
+                if (isNewMessage) {
+                    setTimeout(() => {
+                        messageItem.style.transition = 'all 0.3s ease';
+                        messageItem.style.opacity = '1';
+                        messageItem.style.transform = 'translateY(0)';
+                        
+                        // Remove new message indicator after animation
+                        setTimeout(() => {
+                            const indicator = messageItem.querySelector('.new-message-indicator');
+                            if (indicator) {
+                                indicator.style.transition = 'opacity 0.5s ease';
+                                indicator.style.opacity = '0';
+                                setTimeout(() => indicator.remove(), 500);
+                            }
+                        }, 2000);
+                    }, 50);
+                }
+            });
+
+            // Remove extra message items if we have fewer messages now
+            while (container.children.length > recentMessages.length) {
+                container.removeChild(container.lastChild);
+            }
         }
 
         // Fetch application registrations
@@ -892,7 +1088,7 @@
                 
                 for (const deviceType of deviceTypes) {
                     try {
-                        const response = await fetch(`http://localhost:5002/api/applications/by-device-type/${deviceType}`);
+                        const response = await fetch(`/api/app-registry/${deviceType}`);
                         if (response.ok) {
                             const data = await response.json();
                             appRegistrations[deviceType] = data.applications;
@@ -916,6 +1112,7 @@
 
         // Initialize dashboard
         function initDashboard() {
+            createParticles();
             initCharts();
             fetchMessages();
             fetchAppRegistrations();

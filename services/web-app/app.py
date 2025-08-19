@@ -8,7 +8,7 @@ import json
 import os
 import time
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
 from flask import Flask, render_template, jsonify, request
@@ -21,6 +21,33 @@ app = Flask(__name__)
 KAFKA_BROKERS = os.getenv('REDPANDA_BROKERS', 'redpanda:29092')
 RAW_TOPIC = os.getenv('RAW_TOPIC', 'iot.raw')
 ENRICHED_TOPIC = os.getenv('ENRICHED_TOPIC', 'iot.enriched')
+
+# Get local timezone (default to system timezone)
+LOCAL_TIMEZONE_OFFSET = int(os.getenv('LOCAL_TIMEZONE_OFFSET', '-4'))  # Default to EDT (UTC-4)
+
+def convert_to_local_time(timestamp_str: str) -> str:
+    """Convert UTC timestamp string to local timezone"""
+    try:
+        # Parse the timestamp (handle both ISO format and other formats)
+        if timestamp_str.endswith('Z'):
+            # UTC format
+            dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        elif '+' in timestamp_str:
+            # Already has timezone info
+            dt = datetime.fromisoformat(timestamp_str)
+        else:
+            # Assume UTC if no timezone info
+            dt = datetime.fromisoformat(timestamp_str + '+00:00')
+        
+        # Convert to local timezone
+        local_tz = timezone(timedelta(hours=LOCAL_TIMEZONE_OFFSET))
+        local_dt = dt.astimezone(local_tz)
+        
+        # Format as readable string
+        return local_dt.strftime('%Y-%m-%d %H:%M:%S %Z')
+    except Exception as e:
+        print(f"Error converting timestamp {timestamp_str}: {e}")
+        return timestamp_str  # Return original if conversion fails
 
 # In-memory storage for recent messages (last 100)
 recent_raw_messages = []
@@ -55,24 +82,24 @@ class IoTDashboard:
                 self.raw_topic,
                 bootstrap_servers=self.kafka_brokers,
                 group_id='iot-dashboard-raw',
-                auto_offset_reset='earliest',  # Changed from 'latest' to see existing messages
+                auto_offset_reset='latest',  # Start from latest to avoid replaying old messages
                 enable_auto_commit=True,
                 value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-                key_deserializer=lambda k: k.decode('utf-8') if k else None,
-                consumer_timeout_ms=1000
+                key_deserializer=lambda k: k.decode('utf-8') if k else None
             )
+            print(f"Raw consumer created for topic: {self.raw_topic}")
             
             # Enriched data consumer
             self.enriched_consumer = KafkaConsumer(
                 self.enriched_topic,
                 bootstrap_servers=self.kafka_brokers,
                 group_id='iot-dashboard-enriched',
-                auto_offset_reset='latest',
+                auto_offset_reset='latest',  # Start from latest to avoid replaying old messages
                 enable_auto_commit=True,
                 value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-                key_deserializer=lambda k: k.decode('utf-8') if k else None,
-                consumer_timeout_ms=1000
+                key_deserializer=lambda k: k.decode('utf-8') if k else None
             )
+            print(f"Enriched consumer created for topic: {self.enriched_topic}")
             
             print(f"Dashboard connected to {self.raw_topic} and {self.enriched_topic}")
             message_stats['kafka_connected'] = True
@@ -100,88 +127,149 @@ class IoTDashboard:
     
     def _consume_messages(self):
         """Background thread to continuously consume messages"""
+        print("Starting message consumption loop")
+        raw_errors = 0
+        enriched_errors = 0
+        
         while self.running:
             try:
                 # Consume raw messages
                 if self.raw_consumer:
-                    raw_batch = self.raw_consumer.poll(timeout_ms=1000, max_records=10)
-                    for tp, records in raw_batch.items():
-                        for record in records:
-                            message_data = record.value
-                            message_data['_kafka_info'] = {
-                                'topic': record.topic,
-                                'partition': record.partition,
-                                'offset': record.offset,
-                                'timestamp': record.timestamp,
-                                'message_type': 'raw'
-                            }
-                            self._add_raw_message(message_data)
+                    try:
+                        raw_batch = self.raw_consumer.poll(timeout_ms=1000, max_records=10)
+                        if raw_batch:
+                            print(f"Raw batch: {len(raw_batch)} partitions, records: {sum(len(records) for records in raw_batch.values())}")
+                        for tp, records in raw_batch.items():
+                            for record in records:
+                                try:
+                                    message_data = record.value
+                                    message_data['_kafka_info'] = {
+                                        'topic': record.topic,
+                                        'partition': record.partition,
+                                        'offset': record.offset,
+                                        'timestamp': record.timestamp,
+                                        'message_type': 'raw'
+                                    }
+                                    self._add_raw_message(message_data)
+                                except Exception as e:
+                                    print(f"Error processing raw message: {e}")
+                                    raw_errors += 1
+                    except Exception as e:
+                        print(f"Error polling raw consumer: {e}")
+                        raw_errors += 1
+                        if raw_errors > 5:
+                            print("Too many raw consumer errors, reconnecting...")
+                            self.setup_consumers()
+                            raw_errors = 0
                 
                 # Consume enriched messages
                 if self.enriched_consumer:
-                    enriched_batch = self.enriched_consumer.poll(timeout_ms=1000, max_records=10)
-                    for tp, records in enriched_batch.items():
-                        for record in records:
-                            message_data = record.value
-                            message_data['_kafka_info'] = {
-                                'topic': record.topic,
-                                'partition': record.partition,
-                                'offset': record.offset,
-                                'timestamp': record.timestamp,
-                                'message_type': 'enriched'
-                            }
-                            self._add_enriched_message(message_data)
-                            
+                    try:
+                        enriched_batch = self.enriched_consumer.poll(timeout_ms=1000, max_records=10)
+                        if enriched_batch:
+                            print(f"Enriched batch: {len(enriched_batch)} partitions, records: {sum(len(records) for records in enriched_batch.values())}")
+                        for tp, records in enriched_batch.items():
+                            for record in records:
+                                try:
+                                    message_data = record.value
+                                    message_data['_kafka_info'] = {
+                                        'topic': record.topic,
+                                        'partition': record.partition,
+                                        'offset': record.offset,
+                                        'timestamp': record.timestamp,
+                                        'message_type': 'enriched'
+                                    }
+                                    self._add_enriched_message(message_data)
+                                except Exception as e:
+                                    print(f"Error processing enriched message: {e}")
+                                    enriched_errors += 1
+                    except Exception as e:
+                        print(f"Error polling enriched consumer: {e}")
+                        enriched_errors += 1
+                        if enriched_errors > 5:
+                            print("Too many enriched consumer errors, reconnecting...")
+                            self.setup_consumers()
+                            enriched_errors = 0
+                
+                time.sleep(0.1)  # Small delay to prevent busy waiting
+                
             except Exception as e:
-                print(f"Error in consumer thread: {e}")
-                time.sleep(1)
+                print(f"Error in message consumption: {e}")
+                import traceback
+                print(f"Full error: {traceback.format_exc()}")
+                time.sleep(1)  # Wait before retrying
     
     def _add_raw_message(self, message: Dict[str, Any]):
-        """Add raw message to storage"""
-        global recent_raw_messages
-        
-        # Add timestamp if not present
-        if 'timestamp' not in message:
-            message['timestamp'] = datetime.now().isoformat()
-        
-        # Add to recent messages (keep last 50)
-        recent_raw_messages.insert(0, message)
-        recent_raw_messages = recent_raw_messages[:50]
-        
-        # Update statistics
-        message_stats['total_raw_messages'] += 1
-        message_stats['last_raw_message_time'] = datetime.now()
-        
-        device_id = message.get('device_id', 'unknown')
-        message_stats['devices_seen'].add(device_id)
-        
-        event_type = message.get('event_type', 'telemetry')
-        message_stats['message_types'][event_type] = message_stats['message_types'].get(event_type, 0) + 1
+        """Add a raw message to the recent messages list"""
+        try:
+            # Convert timestamp to local timezone
+            timestamp = message.get('timestamp', 'no-timestamp')
+            local_time = convert_to_local_time(timestamp)
+            print(f"Adding raw message: {message.get('device_id', 'unknown')} at {local_time}")
+            
+            # Add local time to message for display
+            message['local_timestamp'] = local_time
+            
+            recent_raw_messages.append(message)
+            message_stats['total_raw_messages'] += 1
+            message_stats['last_raw_message_time'] = datetime.now()
+            
+            # Extract device ID and message type
+            device_id = message.get('device_id', 'unknown')
+            event_type = message.get('event_type', 'unknown')
+            
+            message_stats['devices_seen'].add(device_id)
+            message_stats['message_types'][event_type] = message_stats['message_types'].get(event_type, 0) + 1
+            
+            # Keep only the last 100 messages
+            if len(recent_raw_messages) > 100:
+                recent_raw_messages.pop(0)
+                
+            print(f"Successfully added raw message. Total: {message_stats['total_raw_messages']}")
+                
+        except Exception as e:
+            print(f"Error adding raw message: {e}")
+            import traceback
+            print(f"Full error: {traceback.format_exc()}")
+            print(f"Message that failed: {message}")
     
     def _add_enriched_message(self, message: Dict[str, Any]):
-        """Add enriched message to storage"""
-        global recent_enriched_messages
-        
-        # Add timestamp if not present
-        if 'timestamp' not in message:
-            message['timestamp'] = datetime.now().isoformat()
-        
-        # Add to recent messages (keep last 50)
-        recent_enriched_messages.insert(0, message)
-        recent_enriched_messages = recent_enriched_messages[:50]
-        
-        # Update statistics
-        message_stats['total_enriched_messages'] += 1
-        message_stats['last_enriched_message_time'] = datetime.now()
-        
-        device_id = message.get('device_id', 'unknown')
-        message_stats['devices_seen'].add(device_id)
-        
-        event_type = message.get('event_type', 'telemetry')
-        message_stats['message_types'][event_type] = message_stats['message_types'].get(event_type, 0) + 1
+        """Add an enriched message to the recent messages list"""
+        try:
+            # Convert timestamp to local timezone
+            timestamp = message.get('timestamp', 'no-timestamp')
+            local_time = convert_to_local_time(timestamp)
+            print(f"Adding enriched message: {message.get('device_id', 'unknown')} at {local_time}")
+            
+            # Add local time to message for display
+            message['local_timestamp'] = local_time
+            
+            recent_enriched_messages.append(message)
+            message_stats['total_enriched_messages'] += 1
+            message_stats['last_enriched_message_time'] = datetime.now()
+            
+            # Extract device ID and message type
+            device_id = message.get('device_id', 'unknown')
+            event_type = message.get('event_type', 'unknown')
+            
+            message_stats['devices_seen'].add(device_id)
+            message_stats['message_types'][event_type] = message_stats['message_types'].get(event_type, 0) + 1
+            
+            # Keep only the last 100 messages
+            if len(recent_enriched_messages) > 100:
+                recent_enriched_messages.pop(0)
+                
+        except Exception as e:
+            print(f"Error adding enriched message: {e}")
+            import traceback
+            print(f"Full error: {traceback.format_exc()}")
 
-# Global dashboard instance
+# Initialize dashboard
 dashboard = IoTDashboard(KAFKA_BROKERS, RAW_TOPIC, ENRICHED_TOPIC)
+
+# Try to connect to Kafka on startup
+if dashboard.setup_consumers():
+    dashboard.start_consuming()
 
 @app.route('/')
 def index():
@@ -213,36 +301,43 @@ def get_messages():
 
 @app.route('/api/stats')
 def get_stats():
-    """API endpoint to get current statistics"""
+    """Get system statistics"""
+    return jsonify({
+        'total_raw_messages': len(recent_raw_messages),
+        'total_enriched_messages': len(recent_enriched_messages),
+        'last_raw_message_time': message_stats['last_raw_message_time'].isoformat() if message_stats['last_raw_message_time'] else None,
+        'last_enriched_message_time': message_stats['last_enriched_message_time'].isoformat() if message_stats['last_enriched_message_time'] else None,
+        'devices_seen': list(message_stats['devices_seen']),
+        'message_types': message_stats['message_types']
+    })
+
+@app.route('/api/app-registry/<device_type>')
+def get_app_registry(device_type):
+    """Proxy endpoint to fetch application registrations from app registry service"""
     try:
-        # Calculate time since last messages
-        now = datetime.now()
-        last_raw_ago = None
-        last_enriched_ago = None
-        
-        if message_stats['last_raw_message_time']:
-            last_raw_ago = int((now - message_stats['last_raw_message_time']).total_seconds())
-        
-        if message_stats['last_enriched_message_time']:
-            last_enriched_ago = int((now - message_stats['last_enriched_message_time']).total_seconds())
-        
-        return jsonify({
-            'success': True,
-            'stats': {
-                'total_raw_messages': message_stats['total_raw_messages'],
-                'total_enriched_messages': message_stats['total_enriched_messages'],
-                'last_raw_message_ago': last_raw_ago,
-                'last_enriched_message_ago': last_enriched_ago,
-                'devices_seen': list(message_stats['devices_seen']),
-                'message_types': message_stats['message_types'],
-                'kafka_connected': message_stats['kafka_connected']
-            }
-        })
+        import requests
+        url = f"http://appregistryservice:5000/api/applications/by-device-type/{device_type}"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({'error': 'Failed to fetch from app registry', 'status': response.status_code}), 500
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'error': 'App registry service unavailable', 'message': str(e)}), 500
+
+@app.route('/api/app-registry')
+def get_all_app_registrations():
+    """Proxy endpoint to fetch all application registrations"""
+    try:
+        import requests
+        url = "http://appregistryservice:5000/api/applications"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({'error': 'Failed to fetch from app registry', 'status': response.status_code}), 500
+    except Exception as e:
+        return jsonify({'error': 'App registry service unavailable', 'message': str(e)}), 500
 
 @app.route('/api/health')
 def health_check():
@@ -284,9 +379,4 @@ def connect_kafka():
         }), 500
 
 if __name__ == '__main__':
-    # Try to connect to Kafka on startup
-    if dashboard.setup_consumers():
-        dashboard.start_consuming()
-    
-    # Start the Flask app
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

@@ -4,5 +4,8 @@ Flask==2.3.3
 # Kafka/RedPanda client
 kafka-python==2.0.2
 
+# HTTP requests for app registry integration
+requests==2.31.0
+
 # Configuration and environment
 python-dotenv==1.0.0

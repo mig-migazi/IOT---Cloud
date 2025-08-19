@@ -64,11 +64,14 @@ services:
       - RAW_TOPIC=iot.raw
       - ENRICHED_TOPIC=iot.enriched
       - DEVICE_REGISTRY_PATH=/app/config/device-registry.json
+      - APP_REGISTRY_URL=http://appregistryservice:5000
     volumes:
       - ./config:/app/config:ro
     depends_on:
       redpanda:
         condition: service_healthy
+      appregistryservice:
+        condition: service_started
     networks:
       - iot-cloud-network
 
@@ -82,6 +85,25 @@ services:
       - RAW_TOPIC=iot.raw
       - DEVICE_ID=breaker-001
       - PUBLISH_INTERVAL=5
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
+  # Application Registry Service - Manages application registrations for device types
+  appregistryservice:
+    build: ./services/appregistryservice
+    container_name: iot-cloud-appregistry
+    restart: unless-stopped
+    ports:
+      - "5002:5000"
+    environment:
+      - FLASK_APP=src/app.py
+      - FLASK_ENV=development
+      - DATABASE_URL=sqlite:///app_registry.db
+    volumes:
+      - appregistry_data:/app/data
     depends_on:
       redpanda:
         condition: service_healthy
@@ -106,6 +128,7 @@ services:
 
 volumes:
   redpanda_data:
+  appregistry_data:
 
 networks:
   iot-cloud-network:

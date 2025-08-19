@@ -202,11 +202,63 @@ def create_app():
             
             return jsonify({
                 'message': 'API key regenerated successfully',
-                'api_key': app_instance.api_key
+                'new_api_key': app_instance.api_key
             })
             
         except Exception as e:
             db.session.rollback()
+            return jsonify({
+                'error': 'Internal server error',
+                'message': str(e)
+            }), 500
+    
+    @app.route('/api/applications/by-device-type/<device_type>', methods=['GET'])
+    def get_applications_by_device_type(device_type):
+        """Get all applications that have registered for a specific device type"""
+        try:
+            # Query applications that have the specified device type in their devicetypes array
+            applications = Application.query.filter(
+                Application.devicetypes.contains([device_type]),
+                Application.status == 'active'  # Only return active applications
+            ).all()
+            
+            return jsonify({
+                'device_type': device_type,
+                'applications': [response_schema.dump(app.to_dict()) for app in applications],
+                'count': len(applications)
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'error': 'Internal server error',
+                'message': str(e)
+            }), 500
+    
+    @app.route('/api/applications/by-device-types', methods=['POST'])
+    def get_applications_by_multiple_device_types():
+        """Get all applications that have registered for any of the specified device types"""
+        try:
+            data = request.get_json()
+            device_types = data.get('device_types', [])
+            
+            if not device_types or not isinstance(device_types, list):
+                return jsonify({
+                    'error': 'device_types must be a non-empty list'
+                }), 400
+            
+            # Query applications that have any of the specified device types
+            applications = Application.query.filter(
+                Application.devicetypes.overlap(device_types),
+                Application.status == 'active'  # Only return active applications
+            ).all()
+            
+            return jsonify({
+                'device_types': device_types,
+                'applications': [response_schema.dump(app.to_dict()) for app in applications],
+                'count': len(applications)
+            })
+            
+        except Exception as e:
             return jsonify({
                 'error': 'Internal server error',
                 'message': str(e)

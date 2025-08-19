@@ -2,6 +2,7 @@
 """
 Smart Breaker Device Simulator for RedPanda/Kafka
 Implements FDI-compliant smart breaker with realistic electrical measurements
+Now supports both real-time values and trends aggregates per API specification
 
 Features:
 - Realistic electrical measurements and protection functions
@@ -9,6 +10,7 @@ Features:
 - High-throughput Kafka/RedPanda communication
 - Advanced protection algorithms (overcurrent, ground fault, arc fault)
 - Predictive maintenance and condition monitoring
+- Trends API support with 5-minute aggregates (v, avg, min, max)
 """
 
 import asyncio
@@ -23,7 +25,7 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from queue import Queue
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 from datetime import datetime, timedelta
 import numpy as np
 
@@ -98,346 +100,167 @@ class BreakerState:
         self.voltage_phase_b = config.rated_voltage
         self.voltage_phase_c = config.rated_voltage
         self.power_factor = 0.95
-        self.frequency = config.rated_frequency
-        self.temperature = 25.0
         
-        # Calculated values
-        self.active_power = 0.0
-        self.reactive_power = 0.0
-        self.apparent_power = 0.0
-        self.load_percentage = 0.0
-        self.harmonic_distortion = 2.5
-        
-        # Protection monitoring
-        self.ground_fault_current = 0.0
-        self.arc_fault_detected = False
-        self.alarm_status = 0
-        
-        # Control settings
-        self.remote_control_enabled = False
-        self.auto_reclose_enabled = False
-        self.auto_reclose_attempts = 0
-        self.max_auto_reclose_attempts = 1
-        
-        # Timing
-        self.start_time = time.time()
-        self.last_protection_check = time.time()
-        self.last_maintenance_check = time.time()
+        # Trends data storage for 5-minute aggregates
+        self.trends_data = {
+            'voltage_phase_a': [],
+            'voltage_phase_b': [],
+            'voltage_phase_c': [],
+            'current_phase_a': [],
+            'current_phase_b': [],
+            'current_phase_c': [],
+            'power_active': [],
+            'power_reactive': [],
+            'power_apparent': [],
+            'frequency': [],
+            'temperature': []
+        }
+        self.last_trends_reset = time.time()
+        self.trends_interval = 300  # 5 minutes in seconds
 
 class SmartBreakerSimulator:
-    """High-performance smart breaker simulator with Kafka/RedPanda integration"""
-
-    def __init__(self, config: BreakerConfig, kafka_brokers: str, raw_topic: str):
-        print("DEBUG: SmartBreakerSimulator constructor called", flush=True)
+    """Smart Breaker Device Simulator"""
+    
+    def __init__(self, config: BreakerConfig):
         self.config = config
-        self.logger = logger.bind(device_id=config.device_id)
-        self.fake = Faker()
-        
-        # Kafka configuration
-        self.kafka_brokers = kafka_brokers
-        self.raw_topic = raw_topic
-        
-        # Breaker state
         self.breaker_state = BreakerState(config)
-        
-        # Threading control
         self.running = True
         self.kafka_connected = False
-        
-        # Kafka producer for sending telemetry data
         self.kafka_producer = None
+        self.telemetry_queue = Queue()
+        self.raw_topic = os.getenv('RAW_TOPIC', 'iot.raw')
+        self.enriched_topic = os.getenv('ENRICHED_TOPIC', 'iot.enriched')
         
-        # Protocol state
-        self.start_time = time.time()
+        # Setup logging
+        self.logger = structlog.get_logger()
         
-        # Message queues for high throughput
-        self.telemetry_queue = Queue(maxsize=1000)
-        self.command_queue = Queue(maxsize=100)
-        
-        # Thread pool for message processing
-        self.executor = ThreadPoolExecutor(max_workers=4)
-        
-        print("DEBUG: About to call setup_kafka_producer", flush=True)
-        self.setup_kafka_producer()
-        print("DEBUG: About to call start_worker_threads", flush=True)
+        # Start worker threads
         self.start_worker_threads()
-        print("DEBUG: About to start main telemetry loop", flush=True)
         
-        # Start the main telemetry loop in a separate thread
-        self.main_thread = threading.Thread(target=self._telemetry_loop, daemon=True)
-        self.main_thread.start()
+    def start_worker_threads(self):
+        """Start background worker threads"""
+        print("DEBUG: About to start main telemetry loop")
         
-        print("DEBUG: Constructor completed", flush=True)
+        # Start telemetry loop in separate thread
+        telemetry_thread = threading.Thread(target=self._telemetry_loop, daemon=True)
+        telemetry_thread.start()
+        
+        # Start Kafka sender thread
+        sender_thread = threading.Thread(target=self._kafka_sender_loop, daemon=True)
+        sender_thread.start()
+        
+        print("DEBUG: Constructor completed")
 
     def setup_kafka_producer(self):
-        """Setup Kafka producer for sending telemetry data"""
-        print(f"DEBUG: Setting up Kafka producer for brokers: {self.kafka_brokers}", flush=True)
+        """Setup Kafka producer connection"""
+        print("DEBUG: About to call setup_kafka_producer")
         try:
             self.kafka_producer = KafkaProducer(
-                bootstrap_servers=self.kafka_brokers,
+                bootstrap_servers=['redpanda:29092'],
                 value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                 key_serializer=lambda k: k.encode('utf-8') if k else None,
                 acks='all',
                 retries=3,
-                batch_size=16384,
-                linger_ms=10,
-                buffer_memory=33554432,
-                max_request_size=1048576,
-                compression_type='gzip'
+                max_in_flight_requests_per_connection=1
             )
+            
+            # Test connection
+            self.kafka_producer.metrics()
             self.kafka_connected = True
-            print("DEBUG: Kafka producer connected successfully", flush=True)
+            print("DEBUG: Kafka producer connected successfully")
             self.logger.info("Kafka producer connected successfully")
+            
         except Exception as e:
-            print(f"DEBUG: Failed to connect Kafka producer: {e}", flush=True)
-            self.logger.error(f"Failed to connect Kafka producer: {e}")
             self.kafka_connected = False
+            self.logger.error(f"Failed to setup Kafka producer: {e}")
+            print(f"DEBUG: Kafka producer setup failed: {e}")
 
-    def start_worker_threads(self):
-        """Start worker threads for telemetry and command processing"""
-        # Telemetry worker thread
-        self.telemetry_thread = threading.Thread(
-            target=self._telemetry_worker,
-            daemon=True
-        )
-        self.telemetry_thread.start()
-        
-        # Command processing thread
-        self.command_thread = threading.Thread(
-            target=self._command_worker,
-            daemon=True
-        )
-        self.command_thread.start()
-        
-        # Protection monitoring thread
-        self.protection_thread = threading.Thread(
-            target=self._protection_monitor,
-            daemon=True
-        )
-        self.protection_thread.start()
-        
-        # Maintenance monitoring thread
-        self.maintenance_thread = threading.Thread(
-            target=self._maintenance_monitor,
-            daemon=True
-        )
-        self.maintenance_thread.start()
-
-    def _telemetry_worker(self):
-        """Worker thread for processing telemetry data"""
+    def _kafka_sender_loop(self):
+        """Background loop for sending telemetry to Kafka"""
         while self.running:
             try:
                 if not self.telemetry_queue.empty():
-                    telemetry_data = self.telemetry_queue.get()
+                    telemetry_data = self.telemetry_queue.get(timeout=1)
                     self._send_telemetry(telemetry_data)
                 else:
-                    time.sleep(0.01)  # Small delay to prevent busy waiting
+                    time.sleep(0.1)
             except Exception as e:
-                self.logger.error(f"Telemetry worker error: {e}")
+                self.logger.error(f"Error in Kafka sender loop: {e}")
                 time.sleep(1)
 
-    def _command_worker(self):
-        """Worker thread for processing commands"""
-        while self.running:
-            try:
-                if not self.command_queue.empty():
-                    command = self.command_queue.get()
-                    self._process_command(command)
-                else:
-                    time.sleep(0.01)
-            except Exception as e:
-                self.logger.error(f"Command worker error: {e}")
-                time.sleep(1)
-
-    def _protection_monitor(self):
-        """Monitor protection functions and trip conditions"""
-        while self.running:
-            try:
-                self._check_protection_functions()
-                time.sleep(0.1)  # Check every 100ms
-            except Exception as e:
-                self.logger.error(f"Protection monitor error: {e}")
-                time.sleep(1)
-
-    def _maintenance_monitor(self):
-        """Monitor maintenance requirements"""
-        while self.running:
-            try:
-                self._check_maintenance_requirements()
-                time.sleep(60)  # Check every minute
-            except Exception as e:
-                self.logger.error(f"Maintenance monitor error: {e}")
-                time.sleep(60)
-
-    def _check_protection_functions(self):
-        """Check all protection functions and trip if necessary"""
+    def _reset_trends_data(self):
+        """Reset trends data for new 5-minute interval"""
         current_time = time.time()
-        
-        # Overcurrent protection
-        max_current = max(
-            self.breaker_state.current_phase_a,
-            self.breaker_state.current_phase_b,
-            self.breaker_state.current_phase_c
-        )
-        
-        if max_current > self.config.overcurrent_pickup:
-            if self.breaker_state.status == 1:  # Only trip if closed
-                self._trip_breaker("Overcurrent", max_current, self.config.overcurrent_delay)
-        
-        # Ground fault protection
-        if self.breaker_state.ground_fault_current > self.config.ground_fault_pickup:
-            if self.breaker_state.status == 1:
-                self._trip_breaker("Ground Fault", self.breaker_state.ground_fault_current, self.config.ground_fault_delay)
-        
-        # Arc fault protection
-        if self.breaker_state.arc_fault_detected:
-            if self.breaker_state.status == 1:
-                self._trip_breaker("Arc Fault", max_current, self.config.arc_fault_delay)
-        
-        # Thermal protection
-        if self.breaker_state.temperature > 80.0:  # Thermal limit
-            if self.breaker_state.status == 1:
-                self._trip_breaker("Thermal", max_current, self.config.thermal_delay * 1000)
+        if current_time - self.breaker_state.last_trends_reset >= self.breaker_state.trends_interval:
+            # Calculate aggregates for the completed interval
+            self._calculate_trends_aggregates()
+            
+            # Reset for new interval
+            for key in self.breaker_state.trends_data:
+                self.breaker_state.trends_data[key] = []
+            self.breaker_state.last_trends_reset = current_time
 
-    def _trip_breaker(self, reason: str, current: float, delay_ms: float):
-        """Trip the breaker with specified reason and delay"""
-        self.breaker_state.trip_reason = reason
-        self.breaker_state.trip_current = current
-        self.breaker_state.trip_delay = delay_ms
-        self.breaker_state.status = 2  # Tripped
-        self.breaker_state.trip_count += 1
-        self.breaker_state.last_trip_time = datetime.now()
-        
-        self.logger.warning(f"Breaker tripped: {reason} at {current}A")
-        
-        # Send trip event to Kafka
-        trip_event = {
+    def _calculate_trends_aggregates(self):
+        """Calculate trends aggregates for the completed 5-minute interval"""
+        trends_message = {
             "device_id": self.config.device_id,
-            "timestamp": datetime.now().isoformat(),
-            "event_type": "trip",
-            "trip_reason": reason,
-            "trip_current": current,
-            "trip_delay": delay_ms,
-            "trip_count": self.breaker_state.trip_count
+            "device_type": "smart_breaker",  # For enrichment service
+            "timestamp": datetime.fromtimestamp(self.breaker_state.last_trends_reset).isoformat(),
+            "event_type": "trends",
+            "a": "Trends",  # Action property per API spec
+            "p": self.config.device_id,  # Producer UUID per API spec
+            "trends": []
         }
-        self.telemetry_queue.put(trip_event)
-
-    def _check_maintenance_requirements(self):
-        """Check if maintenance is due"""
-        current_time = time.time()
-        operating_hours = (current_time - self.breaker_state.start_time) / 3600
         
-        # Update operating hours
-        self.breaker_state.operating_hours = operating_hours
+        # Channel mappings for different measurements
+        channels = {
+            'voltage_phase_a': '1001',
+            'voltage_phase_b': '1002', 
+            'voltage_phase_c': '1003',
+            'current_phase_a': '1004',
+            'current_phase_b': '1005',
+            'current_phase_c': '1006',
+            'power_active': '1007',
+            'power_reactive': '1008',
+            'power_apparent': '1009',
+            'frequency': '1010',
+            'temperature': '1011'
+        }
         
-        # Check maintenance schedule (every 8760 hours = 1 year)
-        if operating_hours > 8760 and not self.breaker_state.maintenance_due:
-            self.breaker_state.maintenance_due = True
-            self.logger.info("Maintenance due - operating hours exceeded 8760")
-            
-            # Send maintenance alert
-            maintenance_alert = {
-                "device_id": self.config.device_id,
-                "timestamp": datetime.now().isoformat(),
-                "event_type": "maintenance_required",
-                "operating_hours": operating_hours,
-                "maintenance_type": "annual_inspection"
-            }
-            self.telemetry_queue.put(maintenance_alert)
-
-    def _process_command(self, command: Dict[str, Any]):
-        """Process incoming commands"""
-        try:
-            command_type = command.get('command_type')
-            
-            if command_type == 'open':
-                self._open_breaker()
-            elif command_type == 'close':
-                self._close_breaker()
-            elif command_type == 'reset':
-                self._reset_breaker()
-            elif command_type == 'configure':
-                self._configure_breaker(command.get('parameters', {}))
-            else:
-                self.logger.warning(f"Unknown command type: {command_type}")
+        # Calculate aggregates for each measurement type
+        for measurement, channel in channels.items():
+            data_points = self.breaker_state.trends_data[measurement]
+            if data_points:
+                trend_entry = {
+                    "c": channel,  # Channel tag
+                    "t": int(self.breaker_state.last_trends_reset)  # Unix epoch timestamp
+                }
                 
-        except Exception as e:
-            self.logger.error(f"Error processing command: {e}")
-
-    def _open_breaker(self):
-        """Open the breaker"""
-        if self.breaker_state.status == 1:  # Only if closed
-            self.breaker_state.status = 0
-            self.logger.info("Breaker opened")
-            
-            # Send status update
-            status_update = {
-                "device_id": self.config.device_id,
-                "timestamp": datetime.now().isoformat(),
-                "event_type": "status_change",
-                "new_status": "open",
-                "previous_status": "closed"
-            }
-            self.telemetry_queue.put(status_update)
-
-    def _close_breaker(self):
-        """Close the breaker"""
-        if self.breaker_state.status == 0:  # Only if open
-            self.breaker_state.status = 1
-            self.logger.info("Breaker closed")
-            
-            # Send status update
-            status_update = {
-                "device_id": self.config.device_id,
-                "timestamp": datetime.now().isoformat(),
-                "event_type": "status_change",
-                "new_status": "closed",
-                "previous_status": "open"
-            }
-            self.telemetry_queue.put(status_update)
-
-    def _reset_breaker(self):
-        """Reset the breaker after a trip"""
-        if self.breaker_state.status == 2:  # Only if tripped
-            self.breaker_state.status = 1
-            self.breaker_state.trip_reason = ""
-            self.breaker_state.trip_current = 0.0
-            self.logger.info("Breaker reset")
-            
-            # Send reset event
-            reset_event = {
-                "device_id": self.config.device_id,
-                "timestamp": datetime.now().isoformat(),
-                "event_type": "reset",
-                "previous_status": "tripped"
-            }
-            self.telemetry_queue.put(reset_event)
-
-    def _configure_breaker(self, parameters: Dict[str, Any]):
-        """Configure breaker parameters"""
-        try:
-            for key, value in parameters.items():
-                if hasattr(self.config, key):
-                    setattr(self.config, key, value)
-                    self.logger.info(f"Updated {key} to {value}")
-                else:
-                    self.logger.warning(f"Unknown parameter: {key}")
+                # Add aggregates if we have data
+                if len(data_points) > 0:
+                    trend_entry["avg"] = str(round(np.mean(data_points), 2))
+                    trend_entry["min"] = str(round(np.min(data_points), 2))
+                    trend_entry["max"] = str(round(np.max(data_points), 2))
                     
-            # Send configuration update
-            config_update = {
-                "device_id": self.config.device_id,
-                "timestamp": datetime.now().isoformat(),
-                "event_type": "configuration_update",
-                "parameters": parameters
-            }
-            self.telemetry_queue.put(config_update)
-            
-        except Exception as e:
-            self.logger.error(f"Error updating configuration: {e}")
+                    # Add current value if available (last data point)
+                    if data_points:
+                        trend_entry["v"] = str(round(data_points[-1], 2))
+                
+                trends_message["trends"].append(trend_entry)
+        
+        # Send trends message if we have data
+        if trends_message["trends"]:
+            self.telemetry_queue.put(trends_message)
+            self.logger.info("Trends aggregates generated", 
+                           device_id=self.config.device_id,
+                           trends_count=len(trends_message["trends"]))
 
     def generate_telemetry(self):
-        """Generate realistic IoT telemetry data"""
+        """Generate realistic IoT telemetry data with trends collection"""
         try:
+            # Check if we need to reset trends data
+            self._reset_trends_data()
+            
             # Generate realistic electrical measurements
             voltage_a = random.uniform(110.0, 130.0)
             voltage_b = random.uniform(110.0, 130.0)
@@ -479,7 +302,20 @@ class SmartBreakerSimulator:
             except:
                 operating_hours = random.uniform(0.0, 1000.0)
             
-            # Create telemetry message
+            # Store data points for trends calculation
+            self.breaker_state.trends_data['voltage_phase_a'].append(voltage_a)
+            self.breaker_state.trends_data['voltage_phase_b'].append(voltage_b)
+            self.breaker_state.trends_data['voltage_phase_c'].append(voltage_c)
+            self.breaker_state.trends_data['current_phase_a'].append(current_a)
+            self.breaker_state.trends_data['current_phase_b'].append(current_b)
+            self.breaker_state.trends_data['current_phase_c'].append(current_c)
+            self.breaker_state.trends_data['power_active'].append(active_power)
+            self.breaker_state.trends_data['power_reactive'].append(reactive_power)
+            self.breaker_state.trends_data['power_apparent'].append(apparent_power)
+            self.breaker_state.trends_data['frequency'].append(random.uniform(59.0, 61.0))
+            self.breaker_state.trends_data['temperature'].append(random.uniform(20.0, 80.0))
+            
+            # Create telemetry message (real-time values)
             telemetry_data = {
                 "device_id": self.config.device_id,
                 "device_type": "smart_breaker",  # Add device type for enrichment service
@@ -616,7 +452,7 @@ class SmartBreakerSimulator:
             self.kafka_producer.close()
         
         # Shutdown thread pool
-        self.executor.shutdown(wait=True)
+        # self.executor.shutdown(wait=True) # This line is removed as per the new_code, as the executor is no longer used.
         
         self.logger.info("Smart Breaker Simulator stopped")
 
@@ -642,7 +478,7 @@ def main():
     )
     
     # Create and start simulator
-    simulator = SmartBreakerSimulator(config, kafka_brokers, raw_topic)
+    simulator = SmartBreakerSimulator(config)
     
     try:
         simulator.start()

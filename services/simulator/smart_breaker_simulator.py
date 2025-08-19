@@ -134,6 +134,9 @@ class SmartBreakerSimulator:
         # Setup logging
         self.logger = structlog.get_logger()
         
+        # Setup Kafka producer first
+        self.setup_kafka_producer()
+        
         # Start worker threads
         self.start_worker_threads()
         
@@ -319,7 +322,7 @@ class SmartBreakerSimulator:
             telemetry_data = {
                 "device_id": self.config.device_id,
                 "device_type": "smart_breaker",  # Add device type for enrichment service
-                "timestamp": time.strftime('%Y-%m-%dT%H:%M:%S.%f'),
+                "timestamp": datetime.now().isoformat(),
                 "event_type": "telemetry",
                 "measurements": {
                     "voltage": {

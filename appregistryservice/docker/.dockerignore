@@ -1,7 +1,3 @@
-# Docker
-docker-compose.override.yml
-.env
-
 # Python
 __pycache__/
 *.py[cod]
@@ -25,19 +21,16 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# Virtual Environment
 venv/
 env/
 ENV/
 .venv/
+.env/
 
-# Database
+# Database files
 *.db
 *.sqlite3
-app_registry.db
-
-# Environment variables
-.env
 
 # IDE
 .vscode/
@@ -52,25 +45,22 @@ app_registry.db
 ._*
 .Spotlight-V100
 .Trashes
-Thumbs.db
 ehthumbs.db
+Thumbs.db
 
-# Flask
-instance/
-.webassets-cache
+# Git
+.git/
+.gitignore
 
-# Logs
-*.log
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
 
-# Temporary files
-*.tmp
-*.temp
+# Documentation
+README.md
+*.md
 
-# Documentation output
-*.pdf
-*.docx
-
-# Organized structure
-src/__pycache__/
-tests/__pycache__/
-config/__pycache__/
+# Test files
+test_*.py
+*_test.py

@@ -1,6 +1,9 @@
 # Kafka/RedPanda client
 kafka-python==2.0.2
 
+# MQTT client for IoT communication
+paho-mqtt==1.6.1
+
 # Data generation and utilities
 faker==19.6.2
 numpy==1.24.3

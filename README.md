@@ -1,24 +1,28 @@
 # ⚡ IoT Cloud Platform
 
-A lightweight, cloud-ready IoT data pipeline with real-time message enrichment, application registry, and visualization dashboard.
+A lightweight, cloud-ready IoT data pipeline with real-time message enrichment, application registry, and **tabbed visualization dashboard** featuring **device-type specific topics** for application data isolation.
 
 ## 🏗️ Architecture
 
 ```
-Smart Breaker Simulator → RedPanda (iot.raw) → Enrichment Service → RedPanda (iot.enriched) → Web Dashboard
-                                    ↓
-                            App Registry Service
-                                    ↓
-                            Application Registrations
+Smart Breaker Simulator → MQTT Broker → MQTT-Kafka Bridge → RedPanda (iot.raw) → Enrichment Service → RedPanda (iot.enriched) → Web Dashboard
+                                    ↓                                    ↓
+                            App Registry Service                    Device-Type Topics
+                                    ↓                                    ↓
+                            Application Registrations         iot.smart_breaker.enriched
+                                                                    ↓
+                                                            Smart Grid Monitor Tab
 ```
 
 ### Core Services
 
-- **Smart Breaker Simulator**: Generates realistic IoT telemetry + trends data every 5 seconds
+- **Smart Breaker Simulator**: Generates realistic IoT telemetry + trends data with **burst logic** (3-8 second intervals) via **MQTT**
+- **MQTT Broker**: Eclipse Mosquitto for IoT device communication and message routing
+- **MQTT-Kafka Bridge**: Connects MQTT topics to RedPanda/Kafka for seamless integration
 - **RedPanda**: Event streaming platform (Kafka-compatible) for message brokering
-- **Enrichment Service**: Adds device metadata, context, and application registrations to raw messages
+- **Enrichment Service**: Adds device metadata, context, and routes data to **both general AND device-type specific topics**
 - **App Registry Service**: Manages applications that register interest in specific device types
-- **Web Dashboard**: Real-time visualization of message flow, system status, and application registrations
+- **Web Dashboard**: **Tabbed interface** with IoT Overview + Smart Grid Monitor for application-specific data isolation
 
 ## 🚀 Quick Start
 
@@ -36,12 +40,27 @@ Smart Breaker Simulator → RedPanda (iot.raw) → Enrichment Service → RedPan
    ```
 
 3. **Access services**:
-   - **Web Dashboard**: http://localhost:5001
+   - **Web Dashboard**: http://localhost:5001 (with IoT Overview + Smart Grid Monitor tabs)
    - **RedPanda Console**: http://localhost:8086
    - **RedPanda API**: localhost:9092 (external), localhost:29092 (internal)
+   - **MQTT Broker**: localhost:1883 (MQTT), localhost:9001 (WebSocket)
    - **App Registry Service**: http://localhost:5002
 
 ## 📊 Data Flow
+
+### Message Routing & Topics
+The system now supports **MQTT-based IoT communication** with seamless Kafka integration:
+
+**MQTT Topics (Device → MQTT Broker):**
+- **`iot/{device_id}/raw`** → Raw telemetry data
+- **`iot/{device_id}/trends`** → Aggregated trends data  
+- **`iot/{device_id}/status`** → Device status information
+
+**Kafka Topics (MQTT Bridge → RedPanda):**
+- **`iot.raw`** → Raw device messages (from MQTT)
+- **`iot.enriched`** → General enriched messages (all device types)
+- **`iot.smart_breaker.enriched`** → Smart breaker data only (for Smart Grid Monitor app)
+- **Future topics**: `iot.smart_meter.enriched`, `iot.environmental_sensor.enriched`
 
 ### Raw Message (from simulator)
 ```json
@@ -155,15 +174,25 @@ curl http://localhost:5002/api/applications/by-device-type/smart_breaker
 ```
 IOT-Cloud/
 ├── config/                     # Configuration files
-│   └── device-registry.json   # Device type definitions
+│   ├── device-registry.json   # Device type definitions
+│   └── mosquitto.conf         # MQTT broker configuration
 ├── services/                   # Microservices
 │   ├── enrichment/            # Message enrichment service
 │   │   ├── enrichment_service.py
 │   │   └── requirements.txt
 │   ├── simulator/             # Smart breaker simulator
 │   │   ├── smart_breaker_simulator.py
+│   │   ├── smart_breaker_simulator_mqtt.py
 │   │   └── requirements.txt
-│   ├── web-app/               # Web dashboard
+│   ├── mqtt-kafka-bridge/     # MQTT to Kafka bridge service
+│   │   ├── app.py
+│   │   ├── requirements.txt
+│   │   └── Dockerfile
+│   ├── web-app/               # Tabbed web dashboard
+│   │   ├── app.py
+│   │   ├── templates/
+│   │   └── requirements.txt
+│   ├── smart-grid-monitor/    # Smart Grid Monitor service
 │   │   ├── app.py
 │   │   ├── templates/
 │   │   └── requirements.txt
@@ -175,25 +204,31 @@ IOT-Cloud/
 │       └── requirements.txt
 ├── docker-compose.yml          # Service orchestration
 ├── setup.sh                    # Initial setup script
+├── test_mqtt.py               # MQTT connectivity test script
 └── README.md                   # This file
 ```
 
 ## 🚀 Features
 
-- **Real-time Telemetry**: Smart breaker simulator generates realistic electrical measurements
-- **Trends Aggregation**: Collects and aggregates historical data every 5 minutes
+- **Real-time Telemetry**: Smart breaker simulator generates realistic electrical measurements with **dynamic burst logic**
+- **Trends Aggregation**: Collects and aggregates historical data during message bursts
 - **Intelligent Enrichment**: Automatically detects device types and adds metadata
 - **Application Registry**: Centralized service for managing application registrations
 - **Device Type Mapping**: Dynamic device type detection and metadata enrichment
-- **Real-time Dashboard**: Beautiful dark IoT command center with live data visualization
+- **Tabbed Dashboard**: **IoT Overview** (system-wide) + **Smart Grid Monitor** (smart breaker only)
+- **Data Isolation**: Each application sees only its relevant device type data
+- **Multi-Topic Architecture**: Route data to general and device-specific topics
 - **Kafka Integration**: Full RedPanda/Kafka compatibility for event streaming
 
 ## 🔧 Development
 
-- **Real-time Dashboard**: View message flow at http://localhost:5001
+- **Tabbed Dashboard**: 
+  - **IoT Overview Tab**: System-wide message flow and status at http://localhost:5001
+  - **Smart Grid Monitor Tab**: Smart breaker data only (application isolation)
 - **RedPanda Console**: Monitor topics and consumers at http://localhost:8086
 - **Service Logs**: `docker-compose logs -f [service-name]`
 - **Test App Registry**: http://localhost:5002/api/applications
+- **Topic Monitoring**: Check device-type specific topics in RedPanda Console
 
 ### Testing the Pipeline
 
@@ -201,7 +236,33 @@ IOT-Cloud/
 2. **Check simulator logs**: `docker-compose logs -f smart-breaker-simulator`
 3. **Monitor enrichment**: `docker-compose logs -f enrichment-service`
 4. **View dashboard**: Open http://localhost:5001
-5. **Register test apps**: Use the curl commands above
+5. **Test tabbed interface**: Switch between IoT Overview and Smart Grid Monitor tabs
+6. **Verify data isolation**: Smart Grid Monitor shows only smart breaker data
+7. **Check topics**: Verify `iot.smart_breaker.enriched` topic in RedPanda Console
+8. **Register test apps**: Use the curl commands above
+
+## 🏗️ New Architecture Features
+
+### **Tabbed Dashboard Interface**
+- **IoT Overview Tab**: System-wide monitoring, all device types, general status
+- **Smart Grid Monitor Tab**: Application-specific view showing ONLY smart breaker data
+- **Data Isolation**: Each tab shows relevant data without cross-contamination
+
+### **Device-Type Specific Topics**
+- **Multi-Topic Routing**: Enrichment service publishes to both general and device-specific topics
+- **Application Isolation**: Each app subscribes to its relevant topic (e.g., `iot.smart_breaker.enriched`)
+- **Scalable Design**: Easy to add new device types and corresponding topics
+
+### **Burst Logic & Dynamic Messaging**
+- **Variable Intervals**: Simulator generates messages every 3-8 seconds (not fixed 5-second intervals)
+- **Burst Generation**: 25% chance of sending 3-6 messages in rapid succession
+- **Trends Integration**: Trends data sent after burst messages for better data analysis
+
+### **MQTT Integration & IoT Standards**
+- **MQTT Protocol**: Industry-standard IoT messaging protocol (QoS 1, retain messages)
+- **Topic Hierarchy**: Structured topics like `iot/{device_id}/{data_type}` for easy routing
+- **Bridge Architecture**: Seamless MQTT → Kafka integration for hybrid IoT/streaming systems
+- **Device Status**: Real-time device online/offline status via MQTT status topics
 
 ## 🚀 Deployment
 

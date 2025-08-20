@@ -1,6 +1,44 @@
 version: '3.8'
 
 services:
+  # MQTT Broker - Eclipse Mosquitto for IoT device communication
+  mqtt-broker:
+    image: eclipse-mosquitto:latest
+    container_name: iot-cloud-mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"     # MQTT (non-TLS)
+      - "9001:9001"     # WebSocket
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mqtt_data:/mosquitto/data
+      - mqtt_logs:/mosquitto/log
+    networks:
+      - iot-cloud-network
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "test", "-m", "test"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MQTT to Kafka Bridge - Connects MQTT topics to RedPanda
+  mqtt-kafka-bridge:
+    build: ./services/mqtt-kafka-bridge
+    container_name: iot-cloud-mqtt-bridge
+    restart: unless-stopped
+    environment:
+      - MQTT_BROKER=mqtt-broker:1883
+      - KAFKA_BROKERS=redpanda:29092
+      - MQTT_TOPICS=iot/+/raw
+      - KAFKA_TOPIC=iot.raw
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+      redpanda:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
   # RedPanda - Event streaming platform
   redpanda:
     image: redpandadata/redpanda:latest
@@ -75,19 +113,19 @@ services:
     networks:
       - iot-cloud-network
 
-  # Smart Breaker Simulator - Generates realistic device data
+  # Smart Breaker Simulator - Generates realistic device data via MQTT
   smart-breaker-simulator:
     build: ./services/simulator
     container_name: iot-cloud-simulator
     restart: unless-stopped
+    command: ["python3", "smart_breaker_simulator_mqtt.py"]
     environment:
-      - REDPANDA_BROKERS=redpanda:29092
-      - RAW_TOPIC=iot.raw
+      - MQTT_BROKER=mqtt-broker:1883
       - DEVICE_ID=breaker-001
       - PUBLISH_INTERVAL=5
     depends_on:
-      redpanda:
-        condition: service_healthy
+      mqtt-broker:
+        condition: service_started
     networks:
       - iot-cloud-network
 
@@ -147,6 +185,8 @@ services:
 volumes:
   redpanda_data:
   appregistry_data:
+  mqtt_data:
+  mqtt_logs:
 
 networks:
   iot-cloud-network:

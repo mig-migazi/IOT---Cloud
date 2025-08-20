@@ -11,7 +11,7 @@ class Application(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
-    version = db.Column(db.String(20), nullable=False)
+    version = db.Column(db.String(20), nullable=True, default='1.0.0')
     developer = db.Column(db.String(100), nullable=False)
     contact_email = db.Column(db.String(120), nullable=False)
     category = db.Column(db.String(50))
@@ -28,7 +28,7 @@ class Application(db.Model):
             'id': self.id,
             'name': self.name,
             'description': self.description,
-            'version': self.version,
+            'version': getattr(self, 'version', '1.0.0'),  # Handle missing column gracefully
             'developer': self.developer,
             'contact_email': self.contact_email,
             'category': self.category,

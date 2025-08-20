@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Grid Monitor - Smart Breaker Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(15px);
+            border-bottom: 2px solid #00d4ff;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #00d4ff;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #888;
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: #00d4ff;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+        }
+
+        .stat-value {
+            color: #00d4ff;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #aaa;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .chart-section {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .chart-section h3 {
+            color: #00d4ff;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+
+        .messages-section {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+        }
+
+        .messages-section h3 {
+            color: #00d4ff;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .message-item {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .message-item:hover {
+            background: rgba(0, 212, 255, 0.15);
+            transform: translateX(5px);
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .message-type {
+            background: #00d4ff;
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .message-timestamp {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .message-summary {
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+
+        .refresh-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .refresh-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-active {
+            background: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .status-warning {
+            background: #ffaa00;
+            box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚡ Smart Grid Monitor</h1>
+        <p>Real-time monitoring of smart breaker performance and grid health</p>
+    </div>
+
+    <div class="container">
+        <!-- Performance Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="total-messages">-</div>
+                <div class="stat-label">Total Messages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="telemetry-count">-</div>
+                <div class="stat-label">Telemetry Messages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="trends-count">-</div>
+                <div class="stat-label">Trends Messages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="last-message">-</div>
+                <div class="stat-label">Last Message</div>
+            </div>
+        </div>
+
+        <!-- Measurement Ranges -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="voltage-range">-</div>
+                <div class="stat-label">Voltage Range (V)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="current-range">-</div>
+                <div class="stat-label">Current Range (A)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="power-range">-</div>
+                <div class="stat-label">Power Range (W)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="temperature-range">-</div>
+                <div class="stat-label">Temperature Range (°C)</div>
+            </div>
+        </div>
+
+        <!-- Real-time Chart -->
+        <div class="chart-section">
+            <h3>📊 Smart Breaker Performance Metrics</h3>
+            <div class="chart-container">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Messages -->
+        <div class="messages-section">
+            <h3>💬 Recent Smart Breaker Messages</h3>
+            <div id="messages-container">
+                <div class="message-item">
+                    <div class="message-summary">Loading smart breaker data...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="refresh-button" onclick="refreshData()" title="Refresh Data">🔄</button>
+
+    <script>
+        let performanceChart = null;
+        let chartData = {
+            labels: [],
+            voltage: [],
+            current: [],
+            power: [],
+            temperature: []
+        };
+
+        // Initialize performance chart
+        function initChart() {
+            const ctx = document.getElementById('performanceChart');
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            label: 'Voltage (V)',
+                            data: chartData.voltage,
+                            borderColor: '#00d4ff',
+                            backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Current (A)',
+                            data: chartData.current,
+                            borderColor: '#00ff88',
+                            backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Power (W)',
+                            data: chartData.power,
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Temperature (°C)',
+                            data: chartData.temperature,
+                            borderColor: '#ffaa00',
+                            backgroundColor: 'rgba(255, 170, 0, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#00d4ff',
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#888',
+                                maxTicksLimit: 10
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#888'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update dashboard with smart breaker data
+        function updateDashboard(data) {
+            // Update statistics
+            document.getElementById('total-messages').textContent = data.stats.total_messages;
+            document.getElementById('telemetry-count').textContent = data.stats.telemetry_count;
+            document.getElementById('trends-count').textContent = data.stats.trends_count;
+            
+            // Update last message time
+            if (data.stats.last_message_time) {
+                const lastTime = new Date(data.stats.last_message_time);
+                document.getElementById('last-message').textContent = lastTime.toLocaleTimeString();
+            }
+
+            // Update measurement ranges
+            document.getElementById('voltage-range').textContent = 
+                `${data.stats.voltage_range.min.toFixed(1)} - ${data.stats.voltage_range.max.toFixed(1)}`;
+            document.getElementById('current-range').textContent = 
+                `${data.stats.current_range.min.toFixed(1)} - ${data.stats.current_range.max.toFixed(1)}`;
+            document.getElementById('power-range').textContent = 
+                `${data.stats.power_range.min.toFixed(0)} - ${data.stats.power_range.max.toFixed(0)}`;
+            document.getElementById('temperature-range').textContent = 
+                `${data.stats.temperature_range.min.toFixed(1)} - ${data.stats.temperature_range.max.toFixed(1)}`;
+
+            // Update chart with new data
+            updateChart(data.data);
+
+            // Update messages
+            updateMessages(data.data);
+        }
+
+        // Update performance chart
+        function updateChart(messages) {
+            if (!performanceChart) return;
+
+            // Process messages for chart data
+            messages.forEach(msg => {
+                if (msg.event_type === 'telemetry' && msg.measurements) {
+                    const timestamp = new Date(msg.timestamp).toLocaleTimeString();
+                    
+                    chartData.labels.push(timestamp);
+                    chartData.voltage.push(msg.measurements.voltage || 0);
+                    chartData.current.push(msg.measurements.current || 0);
+                    chartData.power.push(msg.measurements.power || 0);
+                    chartData.temperature.push(msg.measurements.temperature || 0);
+
+                    // Keep only last 20 data points
+                    if (chartData.labels.length > 20) {
+                        chartData.labels.shift();
+                        chartData.voltage.shift();
+                        chartData.current.shift();
+                        chartData.power.shift();
+                        chartData.temperature.shift();
+                    }
+                }
+            });
+
+            // Update chart
+            performanceChart.data.labels = chartData.labels;
+            performanceChart.data.datasets[0].data = chartData.voltage;
+            performanceChart.data.datasets[1].data = chartData.current;
+            performanceChart.data.datasets[2].data = chartData.power;
+            performanceChart.data.datasets[3].data = chartData.temperature;
+            performanceChart.update('none');
+        }
+
+        // Update messages display
+        function updateMessages(messages) {
+            const container = document.getElementById('messages-container');
+            
+            if (messages.length === 0) {
+                container.innerHTML = '<div class="message-item"><div class="message-summary">No smart breaker messages available</div></div>';
+                return;
+            }
+
+            const recentMessages = messages.slice(-10); // Show last 10 messages
+            
+            let html = '';
+            recentMessages.forEach(msg => {
+                const timestamp = new Date(msg.timestamp).toLocaleString();
+                const deviceId = msg.device_id || 'N/A';
+                const eventType = msg.event_type || 'unknown';
+                
+                let summary = '';
+                if (msg.measurements) {
+                    const measurements = msg.measurements;
+                    summary = `Voltage: ${measurements.voltage || 'N/A'}V, Current: ${measurements.current || 'N/A'}A, Power: ${measurements.power || 'N/A'}W, Temp: ${measurements.temperature || 'N/A'}°C`;
+                } else if (msg.trends) {
+                    summary = `Trends: ${msg.trends.length || 0} data points`;
+                } else {
+                    summary = 'No measurement data';
+                }
+
+                html += `
+                    <div class="message-item">
+                        <div class="message-header">
+                            <span class="message-type">${eventType.toUpperCase()}</span>
+                            <span class="message-timestamp">${timestamp}</span>
+                        </div>
+                        <div class="message-summary">
+                            <strong>Device:</strong> ${deviceId}<br>
+                            <strong>Data:</strong> ${summary}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Fetch smart breaker data
+        async function fetchSmartBreakerData() {
+            try {
+                const response = await fetch('/api/smart-breaker-data');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        updateDashboard(data);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching smart breaker data:', error);
+            }
+        }
+
+        // Refresh all data
+        function refreshData() {
+            fetchSmartBreakerData();
+        }
+
+        // Initialize dashboard
+        function initDashboard() {
+            initChart();
+            fetchSmartBreakerData();
+            
+            // Auto-refresh every 5 seconds
+            setInterval(fetchSmartBreakerData, 5000);
+        }
+
+        // Start dashboard when page loads
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html>

@@ -96,7 +96,7 @@ class IoTEnrichmentService:
             self.consumer = KafkaConsumer(
                 'iot.raw',
                 bootstrap_servers=['redpanda:29092'],
-                auto_offset_reset='earliest',
+                auto_offset_reset='latest',  # Start from latest to avoid replaying old messages
                 group_id='iot-enrichment-service',
                 value_deserializer=lambda m: json.loads(m.decode('utf-8')),
                 key_deserializer=lambda k: k.decode('utf-8') if k else None
@@ -153,7 +153,11 @@ class IoTEnrichmentService:
             device_metadata = self.device_registry.get('device_types', {}).get(device_type, {})
             
             # Query app registry for applications interested in this device type
-            registered_applications = self.query_app_registry(device_type)
+            try:
+                registered_applications = self.query_app_registry(device_type)
+            except Exception as e:
+                self.logger.warning("App registry query failed, using empty list", error=str(e))
+                registered_applications = []
             
             # Create enriched message
             enriched_message = message.copy()
@@ -297,12 +301,27 @@ class IoTEnrichmentService:
                     # Enrich the message
                     enriched_message = self.enrich_message(raw_message)
                     
-                    # Send enriched message to Kafka
+                    # Send enriched message to general topic
                     self.producer.send(
                         'iot.enriched',
                         key=device_id,
                         value=enriched_message
                     )
+                    
+                    # Also send to device-type specific topic for application isolation
+                    device_type = enriched_message.get('device_metadata', {}).get('device_type', 'unknown')
+                    device_topic = f'iot.{device_type}.enriched'
+                    
+                    self.producer.send(
+                        device_topic,
+                        key=device_id,
+                        value=enriched_message
+                    )
+                    
+                    self.logger.info("Message routed to topics", 
+                                   general_topic='iot.enriched',
+                                   device_topic=device_topic,
+                                   device_type=device_type)
                     
                     message_count += 1
                     

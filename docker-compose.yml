@@ -101,7 +101,7 @@ services:
     environment:
       - FLASK_APP=src/app.py
       - FLASK_ENV=development
-      - DATABASE_URL=sqlite:///app/data/app_registry.db
+      - DATABASE_URL=sqlite:////app/data/app_registry.db
     volumes:
       - appregistry_data:/app/data
     depends_on:
@@ -123,6 +123,24 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
+    networks:
+      - iot-cloud-network
+
+  # Smart Grid Monitor - Dedicated web client for smart breaker monitoring
+  smart-grid-monitor:
+    build: ./services/smart-grid-monitor
+    container_name: iot-cloud-smart-grid-monitor
+    restart: unless-stopped
+    ports:
+      - "5003:5000"
+    environment:
+      - REDPANDA_BROKERS=redpanda:29092
+      - SMART_BREAKER_TOPIC=iot.smart_breaker.enriched
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      enrichment-service:
+        condition: service_started
     networks:
       - iot-cloud-network
 

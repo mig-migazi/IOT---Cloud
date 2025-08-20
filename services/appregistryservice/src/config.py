@@ -6,8 +6,8 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
-    # Use absolute path for SQLite database
-    DATABASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+    # Use Docker volume path for SQLite database
+    DATABASE_DIR = '/app/data'
     DATABASE_PATH = os.path.join(DATABASE_DIR, 'app_registry.db')
     
     # Handle Docker environment with proper absolute path

@@ -1,0 +1,20 @@
+{
+  "default": "smart_breaker",
+  "adapters": {
+    "smart_breaker": {
+      "type": "mqtt",
+      "protocol": "sparkplug_b",
+      "topics": ["spBv1.0/+/+/NBIRTH/#", "spBv1.0/+/DDATA/+", "spBv1.0/+/NCMD/+"]
+    },
+    "industrial": {
+      "type": "modbus",
+      "protocol": "tcp",
+      "port": 502
+    },
+    "building": {
+      "type": "http",
+      "protocol": "rest",
+      "endpoint": "/api/v1"
+    }
+  }
+}

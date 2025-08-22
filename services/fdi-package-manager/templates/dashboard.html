@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FDI Package Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            color: #4a5568;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #718096;
+            font-size: 16px;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .card h2 {
+            color: #4a5568;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online {
+            background-color: #48bb78;
+        }
+        
+        .status-offline {
+            background-color: #f56565;
+        }
+        
+        .status-unknown {
+            background-color: #ed8936;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s ease;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .table th,
+        .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .table th {
+            background-color: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        
+        .table tr:hover {
+            background-color: #f7fafc;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .badge-primary {
+            background-color: #bee3f8;
+            color: #2b6cb0;
+        }
+        
+        .badge-success {
+            background-color: #c6f6d5;
+            color: #2f855a;
+        }
+        
+        .badge-warning {
+            background-color: #fef5e7;
+            color: #c05621;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4a5568;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #718096;
+            margin-top: 5px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #718096;
+        }
+        
+        .error {
+            background-color: #fed7d7;
+            color: #c53030;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .success {
+            background-color: #c6f6d5;
+            color: #2f855a;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        .device-data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .data-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        
+        .data-card h3 {
+            margin-top: 0;
+            color: #495057;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 8px;
+        }
+        
+        .measurement-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .measurement-label {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .measurement-value {
+            font-weight: 600;
+            color: #007bff;
+        }
+        
+        .fdi-info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 FDI Package Manager</h1>
+            <p>Manage Field Device Integration packages, monitor devices, and control the FDI server</p>
+        </div>
+        
+        <!-- Server Status -->
+        <div class="card">
+            <h2>📊 Server Status</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" id="server-status">-</div>
+                    <div class="stat-label">Server Status</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="devices-count">-</div>
+                    <div class="stat-label">Devices</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="packages-count">-</div>
+                    <div class="stat-label">Packages</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="opcua-port">-</div>
+                    <div class="stat-label">OPC UA Port</div>
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-success" onclick="startServer()">Start Server</button>
+                <button class="btn btn-danger" onclick="stopServer()">Stop Server</button>
+                <button class="btn" onclick="refreshStatus()">Refresh</button>
+            </div>
+        </div>
+        
+        <!-- FDI Packages -->
+        <div class="card">
+            <h2>📦 FDI Packages</h2>
+            <div>
+                <button class="btn btn-success" onclick="createSmartBreakerPackage()">Create Smart Breaker Package</button>
+                <button class="btn" onclick="refreshPackages()">Refresh</button>
+            </div>
+            <div id="packages-content">
+                <div class="loading">Loading packages...</div>
+            </div>
+        </div>
+        
+        <!-- Devices -->
+        <div class="card">
+            <h2>🔌 Devices</h2>
+            <div>
+                <button class="btn" onclick="refreshDevices()">Refresh</button>
+            </div>
+            <div id="devices-content">
+                <div class="loading">Loading devices...</div>
+            </div>
+        </div>
+        
+        <!-- Device Commands -->
+        <div class="card">
+            <h2>🎮 Device Commands</h2>
+            <div>
+                <select id="command-device" style="padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #e2e8f0;">
+                    <option value="">Select Device</option>
+                </select>
+                <select id="command-type" style="padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #e2e8f0;">
+                    <option value="trip_breaker">Trip Breaker</option>
+                    <option value="reset_breaker">Reset Breaker</option>
+                    <option value="set_trip_threshold">Set Trip Threshold</option>
+                    <option value="get_diagnostics">Get Diagnostics</option>
+                </select>
+                <input type="text" id="command-param" placeholder="Parameter value" style="padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #e2e8f0;">
+                <button class="btn" onclick="sendCommand()">Send Command</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Device Detail Modal -->
+    <div id="deviceModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeDeviceModal()">&times;</span>
+            <h2 id="modal-title">Device Details</h2>
+            <div id="modal-content">
+                <div class="loading">Loading device details...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let devices = [];
+        let packages = [];
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshStatus();
+            refreshPackages();
+            refreshDevices();
+            
+            // Auto-refresh every 10 seconds
+            setInterval(refreshStatus, 10000);
+            setInterval(refreshDevices, 10000);
+        });
+        
+        // Refresh server status
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/server/status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const status = data.status;
+                    document.getElementById('server-status').textContent = status.running ? 'Running' : 'Stopped';
+                    document.getElementById('devices-count').textContent = status.devices_count;
+                    document.getElementById('packages-count').textContent = status.storage_stats.total_packages || 0;
+                    document.getElementById('opcua-port').textContent = status.opcua_port;
+                }
+            } catch (error) {
+                console.error('Error refreshing status:', error);
+            }
+        }
+        
+        // Refresh packages
+        async function refreshPackages() {
+            try {
+                const response = await fetch('/api/packages');
+                const data = await response.json();
+                
+                if (data.success) {
+                    packages = data.packages;
+                    displayPackages();
+                }
+            } catch (error) {
+                console.error('Error refreshing packages:', error);
+            }
+        }
+        
+        // Display packages
+        function displayPackages() {
+            const content = document.getElementById('packages-content');
+            
+            if (packages.length === 0) {
+                content.innerHTML = '<p>No packages found</p>';
+                return;
+            }
+            
+            let html = '<table class="table"><thead><tr><th>Package ID</th><th>Device Type</th><th>Manufacturer</th><th>Model</th><th>Version</th><th>Actions</th></tr></thead><tbody>';
+            
+            packages.forEach(package => {
+                html += `
+                    <tr>
+                        <td>${package.package_id}</td>
+                        <td><span class="badge badge-primary">${package.device_type}</span></td>
+                        <td>${package.manufacturer}</td>
+                        <td>${package.model}</td>
+                        <td>${package.version}</td>
+                        <td>
+                            <button class="btn btn-danger" onclick="deletePackage('${package.package_id}')">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        }
+        
+        // Refresh devices
+        async function refreshDevices() {
+            try {
+                const response = await fetch('/api/devices');
+                const data = await response.json();
+                
+                if (data.success) {
+                    devices = data.devices;
+                    displayDevices();
+                    updateDeviceSelect();
+                }
+            } catch (error) {
+                console.error('Error refreshing devices:', error);
+            }
+        }
+        
+        // Display devices
+        function displayDevices() {
+            const content = document.getElementById('devices-content');
+            
+            if (devices.length === 0) {
+                content.innerHTML = '<p>No devices found</p>';
+                return;
+            }
+            
+            let html = '<table class="table"><thead><tr><th>Device ID</th><th>Type</th><th>Protocol</th><th>Status</th><th>Last Seen</th><th>Actions</th></tr></thead><tbody>';
+            
+            devices.forEach(device => {
+                const statusClass = device.status === 'online' ? 'status-online' : 'status-offline';
+                const lastSeen = new Date(device.last_seen * 1000).toLocaleString();
+                
+                html += `
+                    <tr>
+                        <td>${device.device_id}</td>
+                        <td><span class="badge badge-primary">${device.device_type}</span></td>
+                        <td><span class="badge badge-success">${device.protocol}</span></td>
+                        <td><span class="status-indicator ${statusClass}"></span>${device.status}</td>
+                        <td>${lastSeen}</td>
+                        <td>
+                            <button class="btn" onclick="viewDevice('${device.device_id}')">View</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        }
+        
+        // Update device select for commands
+        function updateDeviceSelect() {
+            const select = document.getElementById('command-device');
+            select.innerHTML = '<option value="">Select Device</option>';
+            
+            devices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.device_id;
+                option.textContent = `${device.device_id} (${device.device_type})`;
+                select.appendChild(option);
+            });
+        }
+        
+        // Start server
+        async function startServer() {
+            try {
+                const response = await fetch('/api/server/start', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Server starting...', 'success');
+                    setTimeout(refreshStatus, 2000);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Error starting server', 'error');
+            }
+        }
+        
+        // Stop server
+        async function stopServer() {
+            try {
+                const response = await fetch('/api/server/stop', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Server stopping...', 'success');
+                    setTimeout(refreshStatus, 2000);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Error stopping server', 'error');
+            }
+        }
+        
+        // Create smart breaker package
+        async function createSmartBreakerPackage() {
+            try {
+                const response = await fetch('/api/packages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ package_type: 'smart_breaker' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Smart breaker package created successfully', 'success');
+                    refreshPackages();
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Error creating package', 'error');
+            }
+        }
+        
+        // Delete package
+        async function deletePackage(packageId) {
+            if (!confirm('Are you sure you want to delete this package?')) return;
+            
+            try {
+                const response = await fetch(`/api/packages/${packageId}`, { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Package deleted successfully', 'success');
+                    refreshPackages();
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Error deleting package', 'error');
+            }
+        }
+        
+        // View device
+        async function viewDevice(deviceId) {
+            try {
+                const response = await fetch(`/api/devices/${deviceId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const device = data.device;
+                    displayDeviceModal(device);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Error viewing device', 'error');
+            }
+        }
+        
+        // Display device modal with rich data
+        function displayDeviceModal(device) {
+            const modal = document.getElementById('deviceModal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalContent = document.getElementById('modal-content');
+            
+            modalTitle.textContent = `Device Details: ${device.device_id}`;
+            
+            let html = `
+                <div class="device-info">
+                    <h3>📱 Device Information</h3>
+                    <div class="measurement-item">
+                        <span class="measurement-label">Device ID:</span>
+                        <span class="measurement-value">${device.device_id}</span>
+                    </div>
+                    <div class="measurement-item">
+                        <span class="measurement-label">Type:</span>
+                        <span class="measurement-value">${device.device_type}</span>
+                    </div>
+                    <div class="measurement-item">
+                        <span class="measurement-label">Protocol:</span>
+                        <span class="measurement-value">${device.protocol}</span>
+                    </div>
+                    <div class="measurement-item">
+                        <span class="measurement-label">Status:</span>
+                        <span class="measurement-value">${device.status}</span>
+                    </div>
+                    <div class="measurement-item">
+                        <span class="measurement-label">Last Seen:</span>
+                        <span class="measurement-value">${new Date(device.last_seen * 1000).toLocaleString()}</span>
+                    </div>
+                </div>
+                
+                <div class="device-data-grid">
+            `;
+            
+            // Add live measurements
+            if (device.live_measurements) {
+                Object.entries(device.live_measurements).forEach(([category, data]) => {
+                    html += `
+                        <div class="data-card">
+                            <h3>📊 ${category.charAt(0).toUpperCase() + category.slice(1)}</h3>
+                    `;
+                    
+                    if (typeof data === 'object' && data !== null) {
+                        Object.entries(data).forEach(([key, value]) => {
+                            if (typeof value !== 'object' || value === null) {
+                                html += `
+                                    <div class="measurement-item">
+                                        <span class="measurement-label">${key.replace(/_/g, ' ').toUpperCase()}:</span>
+                                        <span class="measurement-value">${value}</span>
+                                    </div>
+                                `;
+                            }
+                        });
+                    }
+                    
+                    // Add FDI mapping info
+                    if (device.fdi_mapping && device.fdi_mapping[category]) {
+                        const fdiInfo = device.fdi_mapping[category];
+                        html += `
+                            <div class="fdi-info">
+                                <strong>FDI Parameter:</strong> ${fdiInfo.fdi_parameter}<br>
+                                <strong>Description:</strong> ${fdiInfo.description}<br>
+                                <strong>Access:</strong> ${fdiInfo.access}<br>
+                                ${fdiInfo.unit ? `<strong>Unit:</strong> ${fdiInfo.unit}` : ''}
+                            </div>
+                        `;
+                    }
+                    
+                    html += '</div>';
+                });
+            }
+            
+            html += `
+                </div>
+                
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="btn" onclick="refreshDeviceData('${device.device_id}')">🔄 Refresh Data</button>
+                    <button class="btn btn-success" onclick="openParameterControl('${device.device_id}')">⚙️ Parameter Control</button>
+                </div>
+            `;
+            
+            modalContent.innerHTML = html;
+            modal.style.display = 'block';
+        }
+        
+        // Close device modal
+        function closeDeviceModal() {
+            document.getElementById('deviceModal').style.display = 'none';
+        }
+        
+        // Refresh device data
+        async function refreshDeviceData(deviceId) {
+            try {
+                const response = await fetch(`/api/devices/${deviceId}/measurements`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update the device object with new measurements
+                    const device = devices.find(d => d.device_id === deviceId);
+                    if (device) {
+                        device.metrics = data.data.measurements;
+                        device.last_seen = data.data.timestamp;
+                        
+                        // Refresh the modal if it's open
+                        if (document.getElementById('deviceModal').style.display === 'block') {
+                            displayDeviceModal(device);
+                        }
+                    }
+                    showMessage('Device data refreshed', 'success');
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Error refreshing device data', 'error');
+            }
+        }
+        
+        // Open parameter control
+        async function openParameterControl(deviceId) {
+            try {
+                console.log('🔍 Opening parameter control for device:', deviceId);
+                alert('Parameter control function called for: ' + deviceId); // Debug alert
+                
+                // Get fresh device data from the API
+                const response = await fetch(`/api/devices/${deviceId}`);
+                const data = await response.json();
+                
+                console.log('📡 API response:', data);
+                
+                if (!data.success) {
+                    showMessage('Failed to get device data: ' + (data.error || 'Unknown error'), 'error');
+                    return;
+                }
+                
+                if (!data.device.live_measurements) {
+                    showMessage('No live measurements available for this device', 'error');
+                    return;
+                }
+                
+                const device = data.device;
+                console.log('📊 Device data:', device);
+                console.log('📈 Live measurements:', device.live_measurements);
+                
+                let html = '<h3>⚙️ Parameter Control</h3><p>Select a parameter to change (simulated):</p>';
+                
+                // Create parameter control interface
+                let parameterCount = 0;
+                Object.entries(device.live_measurements).forEach(([category, categoryData]) => {
+                    console.log(`🔍 Processing category: ${category}`, categoryData);
+                    
+                    if (typeof categoryData === 'object' && categoryData !== null) {
+                        Object.entries(categoryData).forEach(([key, value]) => {
+                            if (typeof value !== 'object' || value === null) {
+                                const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value;
+                                html += `
+                                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+                                        <strong>${key.replace(/_/g, ' ').toUpperCase()}:</strong> 
+                                        <span style="color: #007bff; font-weight: bold;">${displayValue}</span><br>
+                                        <input type="text" id="param_${category}_${key}" placeholder="New value" style="margin: 5px 0; padding: 5px; width: 200px; border: 1px solid #ddd; border-radius: 4px;">
+                                        <button class="btn" onclick="changeParameter('${deviceId}', '${category}', '${key}')" style="margin-left: 10px;">Change</button>
+                                    </div>
+                                `;
+                                parameterCount++;
+                                console.log(`✅ Added parameter: ${category}.${key} = ${displayValue}`);
+                            }
+                        });
+                    }
+                });
+                
+                console.log(`📊 Total parameters added: ${parameterCount}`);
+                
+                if (parameterCount === 0) {
+                    html += '<p style="color: #e53e3e; font-style: italic;">No editable parameters found in device data.</p>';
+                }
+                
+                // Add close button
+                html += '<div style="margin-top: 20px; text-align: center;"><button class="btn" onclick="closeParameterControl()">Close</button></div>';
+                
+                // Display in modal
+                const modalContent = document.getElementById('modal-content');
+                if (!modalContent) {
+                    console.error('❌ Modal content element not found!');
+                    alert('Modal content element not found!');
+                    return;
+                }
+                
+                modalContent.innerHTML = html;
+                console.log('🎉 Parameter control modal populated successfully');
+                
+            } catch (error) {
+                console.error('❌ Error in openParameterControl:', error);
+                showMessage('Error loading parameter control: ' + error.message, 'error');
+            }
+        }
+        
+        // Change parameter value
+        async function changeParameter(deviceId, category, key) {
+            const inputElement = document.getElementById(`param_${category}_${key}`);
+            const newValue = inputElement.value.trim();
+            
+            if (!newValue) {
+                showMessage('Please enter a new value', 'error');
+                return;
+            }
+            
+            try {
+                // Try to parse the value appropriately
+                let parsedValue = newValue;
+                if (newValue.toLowerCase() === 'true') parsedValue = true;
+                else if (newValue.toLowerCase() === 'false') parsedValue = false;
+                else if (!isNaN(newValue)) parsedValue = parseFloat(newValue);
+                
+                const response = await fetch(`/api/devices/${deviceId}/parameter`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        parameter: `${category}.${key}`, 
+                        value: parsedValue 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(`Parameter changed successfully: ${data.message}`, 'success');
+                    // Refresh the device data
+                    setTimeout(() => refreshDeviceData(deviceId), 1000);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+                
+            } catch (error) {
+                showMessage('Error changing parameter: ' + error.message, 'error');
+            }
+        }
+        
+        // Close parameter control
+        function closeParameterControl() {
+            // Refresh the device modal to show updated data
+            const deviceId = document.querySelector('#modal-title').textContent.split(': ')[1];
+            if (deviceId) {
+                viewDevice(deviceId);
+            }
+        }
+        
+        // Send command
+        async function sendCommand() {
+            const deviceId = document.getElementById('command-device').value;
+            const command = document.getElementById('command-type').value;
+            const param = document.getElementById('command-param').value;
+            
+            if (!deviceId) {
+                showMessage('Please select a device', 'error');
+                return;
+            }
+            
+            try {
+                const parameters = {};
+                if (param && command === 'set_trip_threshold') {
+                    parameters.threshold = parseFloat(param);
+                }
+                
+                const response = await fetch(`/api/devices/${deviceId}/command`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command, parameters })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Error sending command', 'error');
+            }
+        }
+        
+        // Show message
+        function showMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type === 'success' ? 'success' : 'error';
+            messageDiv.textContent = message;
+            
+            document.querySelector('.container').insertBefore(messageDiv, document.querySelector('.header').nextSibling);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

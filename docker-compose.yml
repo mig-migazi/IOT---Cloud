@@ -17,23 +17,26 @@ services:
       - iot-cloud-network
     healthcheck:
       test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "test", "-m", "test"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 3
+      start_period: 10s
 
   # MQTT to Kafka Bridge - Connects MQTT topics to RedPanda
   mqtt-kafka-bridge:
-    build: ./services/mqtt-kafka-bridge
+    build:
+      context: ./services/mqtt-kafka-bridge
+      no_cache: true
     container_name: iot-cloud-mqtt-bridge
     restart: unless-stopped
     environment:
-      - MQTT_BROKER=mqtt-broker:1883
+      - MQTT_BROKER=iot-cloud-mqtt:1883
       - KAFKA_BROKERS=redpanda:29092
       - MQTT_TOPICS=iot/+/raw
       - KAFKA_TOPIC=iot.raw
     depends_on:
       mqtt-broker:
-        condition: service_started
+        condition: service_healthy
       redpanda:
         condition: service_healthy
     networks:
@@ -94,7 +97,9 @@ services:
 
   # Enrichment Service - Processes raw messages and adds device metadata
   enrichment-service:
-    build: ./services/enrichment
+    build:
+      context: ./services/enrichment
+      no_cache: true
     container_name: iot-cloud-enrichment
     restart: unless-stopped
     environment:
@@ -103,6 +108,7 @@ services:
       - ENRICHED_TOPIC=iot.enriched
       - DEVICE_REGISTRY_PATH=/app/config/device-registry.json
       - APP_REGISTRY_URL=http://appregistryservice:5000
+      - FDI_PACKAGE_MANAGER_URL=http://fdi-package-manager:5000
     volumes:
       - ./config:/app/config:ro
     depends_on:
@@ -110,12 +116,16 @@ services:
         condition: service_healthy
       appregistryservice:
         condition: service_started
+      fdi-package-manager:
+        condition: service_started
     networks:
       - iot-cloud-network
 
   # Smart Breaker Simulator - Generates realistic device data via MQTT
   smart-breaker-simulator:
-    build: ./services/simulator
+    build:
+      context: ./services/simulator
+      no_cache: true
     container_name: iot-cloud-simulator
     restart: unless-stopped
     command: ["python3", "smart_breaker_simulator_mqtt.py"]
@@ -131,7 +141,9 @@ services:
 
   # Application Registry Service - Manages application registrations for device types
   appregistryservice:
-    build: ./services/appregistryservice
+    build:
+      context: ./services/appregistryservice
+      no_cache: true
     container_name: iot-cloud-appregistry
     restart: unless-stopped
     ports:
@@ -150,7 +162,9 @@ services:
 
   # Web App - Message flow visualization dashboard
   web-app:
-    build: ./services/web-app
+    build:
+      context: ./services/web-app
+      no_cache: true
     container_name: iot-cloud-web-app
     restart: unless-stopped
     ports:
@@ -166,7 +180,9 @@ services:
 
   # Smart Grid Monitor - Dedicated web client for smart breaker monitoring
   smart-grid-monitor:
-    build: ./services/smart-grid-monitor
+    build:
+      context: ./services/smart-grid-monitor
+      no_cache: true
     container_name: iot-cloud-smart-grid-monitor
     restart: unless-stopped
     ports:
@@ -182,12 +198,37 @@ services:
     networks:
       - iot-cloud-network
 
+  # FDI Package Manager - Manages FDI packages and provides OPC UA interface
+  fdi-package-manager:
+    build:
+      context: ./services/fdi-package-manager
+      no_cache: true
+    container_name: iot-cloud-fdi-manager
+    restart: unless-stopped
+    ports:
+      - "5004:5000"     # Web UI
+      - "4840:4840"     # OPC UA
+    environment:
+      - FLASK_APP=web_ui.py
+      - FLASK_ENV=development
+    volumes:
+      - fdi_packages:/app/fdi-packages
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
 volumes:
   redpanda_data:
   appregistry_data:
   mqtt_data:
   mqtt_logs:
+  fdi_packages:
 
 networks:
   iot-cloud-network:
+    name: iot-cloud_iot-cloud-network
     driver: bridge

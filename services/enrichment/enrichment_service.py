@@ -2,7 +2,7 @@
 """
 IoT Data Enrichment Service
 Enriches raw IoT messages with device metadata and context
-Now integrates with Application Registry Service to include application registration information
+Now integrates with FDI Package Manager for device definitions and Application Registry Service
 """
 
 import json
@@ -20,13 +20,14 @@ load_dotenv()
 class IoTEnrichmentService:
     def __init__(self):
         self.logger = structlog.get_logger()
-        self.device_registry = self.load_device_registry()
+        self.fdi_package_manager_url = os.getenv('FDI_PACKAGE_MANAGER_URL', 'http://fdi-package-manager:5000')
         self.app_registry_url = os.getenv('APP_REGISTRY_URL', 'http://appregistryservice:5000')
+        self.fallback_device_registry = self.load_fallback_device_registry()
         self.setup_kafka_producer()
         self.setup_kafka_consumer()
         
-    def load_device_registry(self) -> Dict[str, Any]:
-        """Load device type registry from JSON file"""
+    def load_fallback_device_registry(self) -> Dict[str, Any]:
+        """Load fallback device type registry from JSON file (for backward compatibility)"""
         try:
             # Try multiple possible paths for the device registry
             possible_paths = [
@@ -41,18 +42,98 @@ class IoTEnrichmentService:
                     if os.path.exists(registry_path):
                         with open(registry_path, 'r') as f:
                             registry = json.load(f)
-                        self.logger.info("Device registry loaded successfully", 
+                        self.logger.info("Fallback device registry loaded successfully", 
                                        device_types=len(registry.get('device_types', {})),
                                        registry_path=registry_path)
                         return registry
                 except Exception as e:
-                    self.logger.warning(f"Failed to load registry from {registry_path}: {e}")
+                    self.logger.warning(f"Failed to load fallback registry from {registry_path}: {e}")
                     continue
             
-            self.logger.error("Could not load device registry from any location")
+            self.logger.warning("Could not load fallback device registry from any location")
             return {}
         except Exception as e:
-            self.logger.error("Failed to load device registry", error=str(e))
+            self.logger.error("Failed to load fallback device registry", error=str(e))
+            return {}
+    
+    def get_fdi_package(self, device_type: str) -> Optional[Dict[str, Any]]:
+        """Get FDI package for a device type from the FDI Package Manager"""
+        try:
+            url = f"{self.fdi_package_manager_url}/api/fdi-package/{device_type}"
+            response = requests.get(url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success'):
+                    package = data.get('package', {})
+                    self.logger.info(f"Retrieved FDI package for device type {device_type}", 
+                                   package_id=package.get('package_id'))
+                    return package
+                else:
+                    self.logger.warning(f"FDI package query failed: {data.get('error')}")
+                    return None
+            else:
+                self.logger.warning(f"FDI package query failed with status {response.status_code}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            self.logger.warning(f"Failed to query FDI package manager for {device_type}: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Unexpected error querying FDI package manager: {e}")
+            return None
+    
+    def get_device_metadata_from_fdi(self, fdi_package: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract device metadata from FDI package"""
+        try:
+            device_type_data = fdi_package.get('device_type', {})
+            
+            metadata = {
+                'device_type': device_type_data.get('device_type', 'unknown'),
+                'device_type_name': device_type_data.get('name', 'Unknown Device Type'),
+                'device_type_description': device_type_data.get('description', ''),
+                'device_category': device_type_data.get('category', 'unknown'),
+                'capabilities': device_type_data.get('capabilities', []),
+                'data_format': device_type_data.get('data_format', 'json'),
+                'update_frequency': device_type_data.get('update_frequency', 'unknown'),
+                'retention_policy': device_type_data.get('retention_policy', 'unknown'),
+                'manufacturer': device_type_data.get('manufacturer', 'unknown'),
+                'model': device_type_data.get('model', 'unknown'),
+                'version': device_type_data.get('version', 'unknown')
+            }
+            
+            # Add measurement metadata if available
+            if 'parameters' in device_type_data:
+                metadata['measurement_metadata'] = self._extract_measurement_metadata_from_fdi(device_type_data['parameters'])
+            
+            return metadata
+            
+        except Exception as e:
+            self.logger.error("Error extracting device metadata from FDI package", error=str(e))
+            return {}
+    
+    def _extract_measurement_metadata_from_fdi(self, parameters: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract measurement metadata from FDI package parameters"""
+        try:
+            measurement_metadata = {}
+            
+            for param in parameters:
+                param_name = param.get('name', '')
+                if param_name:
+                    measurement_metadata[param_name] = {
+                        'unit': param.get('unit'),
+                        'description': param.get('description', ''),
+                        'min_value': param.get('min_value'),
+                        'max_value': param.get('max_value'),
+                        'data_type': param.get('data_type', 'unknown'),
+                        'category': param.get('category', 'measurement'),
+                        'access_level': param.get('access_level', 'read_write')
+                    }
+            
+            return measurement_metadata
+            
+        except Exception as e:
+            self.logger.error("Error extracting measurement metadata from FDI package", error=str(e))
             return {}
     
     def query_app_registry(self, device_type: str) -> List[Dict[str, Any]]:
@@ -106,42 +187,35 @@ class IoTEnrichmentService:
             self.logger.error("Failed to setup Kafka consumer", error=str(e))
             raise
     
-    def determine_device_type(self, message: Dict[str, Any]) -> Optional[str]:
+    def determine_device_type(self, message: Dict[str, Any]) -> str:
         """Determine device type from message content"""
         try:
-            # Look for device_type in message first (our hack for POC)
-            if 'device_type' in message:
-                return message['device_type']
+            # Try to get device type from message
+            device_type = message.get('device_type')
+            if device_type:
+                return device_type
             
-            # Check if this is a trends message (new format)
-            if 'trends' in message and isinstance(message['trends'], list):
-                # This is a trends message, check for device type context
-                if 'device_type' in message:
-                    return message['device_type']
-                # Could also infer from trends data structure if needed
-                return 'smart_breaker'  # Default for trends from smart breaker
-            
-            # Infer from measurements structure (existing format)
-            measurements = message.get('measurements', {})
-            
-            # Smart breaker detection
-            if all(key in measurements for key in ['voltage', 'current', 'power', 'frequency']):
-                if 'phase_a' in measurements.get('voltage', {}):
+            # Try to infer from measurements or other fields
+            if 'measurements' in message:
+                measurements = message['measurements']
+                
+                # Check for smart breaker specific measurements
+                if any(key in measurements for key in ['voltage', 'current', 'power', 'breaker_status']):
                     return 'smart_breaker'
-            
-            # Smart meter detection
-            if 'energy' in measurements or 'demand' in measurements:
-                return 'smart_meter'
-            
-            # Environmental sensor detection
-            if all(key in measurements for key in ['temperature', 'humidity']):
-                return 'environmental_sensor'
+                
+                # Check for smart meter specific measurements
+                if any(key in measurements for key in ['energy', 'demand', 'power_factor']):
+                    return 'smart_meter'
+                
+                # Check for environmental sensor specific measurements
+                if any(key in measurements for key in ['temperature', 'humidity', 'pressure']):
+                    return 'environmental_sensor'
             
             # Default fallback
             return 'unknown'
             
         except Exception as e:
-            self.logger.error("Error determining device type", error=str(e), message=message)
+            self.logger.error("Error determining device type", error=str(e))
             return 'unknown'
     
     def enrich_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
@@ -149,8 +223,32 @@ class IoTEnrichmentService:
         try:
             device_type = self.determine_device_type(message)
             
-            # Get device type metadata from registry
-            device_metadata = self.device_registry.get('device_types', {}).get(device_type, {})
+            # Try to get FDI package first
+            fdi_package = self.get_fdi_package(device_type)
+            
+            if fdi_package:
+                # Use FDI package for device metadata
+                device_metadata = self.get_device_metadata_from_fdi(fdi_package)
+                self.logger.info(f"Using FDI package for device type {device_type}", 
+                               package_id=fdi_package.get('package_id'))
+            else:
+                # Fallback to static device registry
+                device_metadata = self.fallback_device_registry.get('device_types', {}).get(device_type, {})
+                if device_metadata:
+                    self.logger.info(f"Using fallback device registry for device type {device_type}")
+                else:
+                    # Create minimal metadata for unknown device types
+                    device_metadata = {
+                        'device_type': device_type,
+                        'device_type_name': 'Unknown Device Type',
+                        'device_type_description': 'Device type not found in FDI packages or registry',
+                        'device_category': 'unknown',
+                        'capabilities': [],
+                        'data_format': 'json',
+                        'update_frequency': 'unknown',
+                        'retention_policy': 'unknown'
+                    }
+                    self.logger.warning(f"Device type {device_type} not found in FDI packages or fallback registry")
             
             # Query app registry for applications interested in this device type
             try:
@@ -163,34 +261,8 @@ class IoTEnrichmentService:
             enriched_message = message.copy()
             
             # Add device type metadata
-            if device_metadata:
-                enriched_message['device_metadata'] = {
-                    'device_type': device_type,
-                    'device_type_name': device_metadata.get('name', 'Unknown Device Type'),
-                    'device_type_description': device_metadata.get('description', ''),
-                    'device_category': device_metadata.get('category', 'unknown'),
-                    'capabilities': device_metadata.get('capabilities', []),
-                    'data_format': device_metadata.get('data_format', 'json'),
-                    'update_frequency': device_metadata.get('update_frequency', 'unknown'),
-                    'retention_policy': device_metadata.get('retention_policy', 'unknown')
-                }
+            enriched_message['device_metadata'] = device_metadata
                 
-                # Add measurement metadata if available
-                if 'measurements' in device_metadata:
-                    enriched_message['measurement_metadata'] = device_metadata['measurements']
-            else:
-                # Fallback for unknown device types
-                enriched_message['device_metadata'] = {
-                    'device_type': device_type,
-                    'device_type_name': 'Unknown Device Type',
-                    'device_type_description': 'Device type not found in registry',
-                    'device_category': 'unknown',
-                    'capabilities': [],
-                    'data_format': 'json',
-                    'update_frequency': 'unknown',
-                    'retention_policy': 'unknown'
-                }
-            
             # Add application registration information
             enriched_message['application_registry'] = {
                 'device_type': device_type,
@@ -203,8 +275,9 @@ class IoTEnrichmentService:
             enriched_message['enrichment_info'] = {
                 'enriched_at': time.strftime('%Y-%m-%dT%H:%M:%S.%f'),
                 'enrichment_service': 'iot-enrichment-service',
-                'enrichment_version': '1.0.0',
+                'enrichment_version': '2.0.0',
                 'device_type_detected': device_type,
+                'fdi_package_used': fdi_package is not None,
                 'app_registry_integration': True
             }
             
@@ -212,7 +285,8 @@ class IoTEnrichmentService:
             enriched_message['data_quality'] = {
                 'timestamp_valid': 'timestamp' in message,
                 'measurements_complete': self.validate_measurements(message, device_metadata),
-                'enrichment_success': True
+                'enrichment_success': True,
+                'fdi_package_available': fdi_package is not None
             }
             
             # Add message type classification
@@ -241,7 +315,7 @@ class IoTEnrichmentService:
             message['enrichment_info'] = {
                 'enriched_at': time.strftime('%Y-%m-%dT%H:%M:%S.%f'),
                 'enrichment_service': 'iot-enrichment-service',
-                'enrichment_version': '1.0.0',
+                'enrichment_version': '2.0.0',
                 'error': True
             }
             return message
@@ -249,27 +323,18 @@ class IoTEnrichmentService:
     def validate_measurements(self, message: Dict[str, Any], device_metadata: Dict[str, Any]) -> bool:
         """Validate that message contains expected measurements for device type"""
         try:
-            # Handle trends messages differently
-            if 'trends' in message and isinstance(message['trends'], list):
-                # For trends, validate that we have at least some trend data
-                if not message['trends']:
-                    return False
-                
-                # Check that each trend has required fields
-                for trend in message['trends']:
-                    if not all(key in trend for key in ['c', 't']):  # channel and timestamp required
-                        return False
+            if 'measurements' not in message:
+                return False
+            
+            measurements = message['measurements']
+            measurement_metadata = device_metadata.get('measurement_metadata', {})
+            
+            if not measurement_metadata:
+                # If no measurement metadata available, consider it valid
                 return True
             
-            # Handle regular telemetry messages
-            measurements = message.get('measurements', {})
-            expected_measurements = device_metadata.get('measurements', {})
-            
-            if not expected_measurements:
-                return True  # No validation possible
-            
-            # Check if required measurements are present
-            required_keys = list(expected_measurements.keys())
+            # Check for required measurements
+            required_keys = list(measurement_metadata.keys())
             present_keys = list(measurements.keys())
             
             # Calculate completeness percentage
@@ -284,7 +349,7 @@ class IoTEnrichmentService:
     
     def process_messages(self):
         """Main message processing loop"""
-        self.logger.info("Starting message processing loop")
+        self.logger.info("Starting message processing loop with FDI package manager integration")
         message_count = 0
         
         try:
@@ -357,7 +422,7 @@ class IoTEnrichmentService:
 
 def main():
     """Main entry point"""
-    print("🚀 Starting IoT Enrichment Service...")
+    print("🚀 Starting IoT Enrichment Service with FDI Package Manager Integration...")
     
     try:
         service = IoTEnrichmentService()

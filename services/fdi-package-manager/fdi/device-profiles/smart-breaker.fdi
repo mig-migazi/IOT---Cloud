@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FDI xmlns="http://www.opcfoundation.org/FDI/2011/Device">
+  <DeviceIdentity>
+    <DeviceType>SmartCircuitBreaker</DeviceType>
+    <DeviceRevision>1.0</DeviceRevision>
+    <DeviceRevisionDate>2024-01-01</DeviceRevisionDate>
+    <DeviceManufacturer>Smart</DeviceManufacturer>
+    <DeviceModel>XSeries-SmartBreaker</DeviceModel>
+    <DeviceSerialNumber>ETN-XSB-001</DeviceSerialNumber>
+    <DeviceVersion>2.1.0</DeviceVersion>
+    <DeviceDescription>Smart XSeries Smart Circuit Breaker with Advanced Monitoring</DeviceDescription>
+  </DeviceIdentity>
+  
+  <DeviceType>
+    <DeviceTypeName>SmartCircuitBreaker</DeviceTypeName>
+    <DeviceTypeDescription>Intelligent circuit breaker with real-time monitoring and control capabilities</DeviceTypeDescription>
+    <DeviceTypeClass>PowerDistribution</DeviceTypeClass>
+    <DeviceTypeCategory>CircuitProtection</DeviceTypeCategory>
+  </DeviceType>
+  
+  <DeviceCapabilities>
+    <CommunicationProtocols>
+      <Protocol name="LwM2M" version="1.2" transport="MQTT">
+        <ObjectModel>
+          <Object ID="3" name="Device">
+            <Instance ID="0">
+              <Resource ID="0" name="Manufacturer" type="String" mandatory="true"/>
+              <Resource ID="1" name="ModelNumber" type="String" mandatory="true"/>
+              <Resource ID="2" name="SerialNumber" type="String" mandatory="true"/>
+              <Resource ID="3" name="FirmwareVersion" type="String" mandatory="true"/>
+              <Resource ID="9" name="BatteryLevel" type="Integer" units="%" range="0-100"/>
+              <Resource ID="10" name="MemoryFree" type="Integer" units="KB"/>
+              <Resource ID="11" name="ErrorCode" type="Integer"/>
+              <Resource ID="13" name="CurrentTime" type="Time"/>
+              <Resource ID="14" name="UTCOffset" type="String"/>
+              <Resource ID="15" name="Timezone" type="String"/>
+            </Instance>
+          </Object>
+          
+          <Object ID="4" name="ConnectivityMonitoring">
+            <Instance ID="0">
+              <Resource ID="0" name="NetworkBearer" type="Integer"/>
+              <Resource ID="1" name="AvailableNetworkBearer" type="Integer"/>
+              <Resource ID="2" name="RadioSignalStrength" type="Integer" units="dBm"/>
+              <Resource ID="3" name="LinkQuality" type="Integer" units="%" range="0-100"/>
+              <Resource ID="4" name="IPAddresses" type="String"/>
+              <Resource ID="5" name="RouterIPAddress" type="String"/>
+              <Resource ID="6" name="LinkUtilization" type="Integer" units="%" range="0-100"/>
+              <Resource ID="7" name="APN" type="String"/>
+              <Resource ID="8" name="CellID" type="Integer"/>
+              <Resource ID="9" name="SMNC" type="Integer"/>
+              <Resource ID="10" name="SMCC" type="Integer"/>
+            </Instance>
+          </Object>
+          
+          <Object ID="3200" name="SmartBreaker">
+            <Instance ID="0">
+              <Resource ID="0" name="BreakerStatus" type="Integer" range="0-3">
+                <ValueMap>
+                  <Value ID="0" name="Open"/>
+                  <Value ID="1" name="Closed"/>
+                  <Value ID="2" name="Tripped"/>
+                  <Value ID="3" name="Fault"/>
+                </ValueMap>
+              </Resource>
+              <Resource ID="1" name="CurrentPhaseA" type="Float" units="A" range="0-1000"/>
+              <Resource ID="2" name="CurrentPhaseB" type="Float" units="A" range="0-1000"/>
+              <Resource ID="3" name="CurrentPhaseC" type="Float" units="A" range="0-1000"/>
+              <Resource ID="4" name="VoltagePhaseA" type="Float" units="V" range="0-600"/>
+              <Resource ID="5" name="VoltagePhaseB" type="Float" units="V" range="0-600"/>
+              <Resource ID="6" name="VoltagePhaseC" type="Float" units="V" range="0-600"/>
+              <Resource ID="7" name="PowerFactor" type="Float" range="0-1"/>
+              <Resource ID="8" name="ActivePower" type="Float" units="kW"/>
+              <Resource ID="9" name="ReactivePower" type="Float" units="kVAR"/>
+              <Resource ID="10" name="ApparentPower" type="Float" units="kVA"/>
+              <Resource ID="11" name="Frequency" type="Float" units="Hz" range="45-65"/>
+              <Resource ID="12" name="Temperature" type="Float" units="°C" range="-40-85"/>
+              <Resource ID="13" name="TripCount" type="Integer" range="0-999999"/>
+              <Resource ID="14" name="LastTripTime" type="Time"/>
+              <Resource ID="15" name="TripReason" type="String"/>
+              <Resource ID="16" name="TripCurrent" type="Float" units="A"/>
+              <Resource ID="17" name="TripDelay" type="Float" units="ms"/>
+              <Resource ID="18" name="GroundFaultCurrent" type="Float" units="A" range="0-100"/>
+              <Resource ID="19" name="ArcFaultDetected" type="Boolean"/>
+              <Resource ID="20" name="MaintenanceDue" type="Boolean"/>
+              <Resource ID="21" name="OperatingHours" type="Integer" units="hours"/>
+              <Resource ID="22" name="LoadPercentage" type="Float" units="%" range="0-100"/>
+              <Resource ID="23" name="HarmonicDistortion" type="Float" units="%" range="0-100"/>
+              <Resource ID="24" name="BreakerPosition" type="Integer" range="0-2">
+                <ValueMap>
+                  <Value ID="0" name="Disconnected"/>
+                  <Value ID="1" name="Connected"/>
+                  <Value ID="2" name="Test"/>
+                </ValueMap>
+              </Resource>
+              <Resource ID="25" name="RemoteControlEnabled" type="Boolean"/>
+              <Resource ID="26" name="AutoRecloseEnabled" type="Boolean"/>
+              <Resource ID="27" name="AutoRecloseAttempts" type="Integer" range="0-3"/>
+              <Resource ID="28" name="ProtectionSettings" type="Objlnk"/>
+              <Resource ID="29" name="AlarmStatus" type="Integer" range="0-255"/>
+            </Instance>
+          </Object>
+        </ObjectModel>
+      </Protocol>
+      
+      <Protocol name="OPC UA" version="1.04" transport="TCP">
+        <ObjectModel>
+          <Object ID="1001" name="SmartBreaker">
+            <Instance ID="0">
+              <Variable ID="1001" name="BreakerStatus" type="Int16" access="read_write"/>
+              <Variable ID="1002" name="CurrentPhaseA" type="Float" access="read_only"/>
+              <Variable ID="1003" name="CurrentPhaseB" type="Float" access="read_only"/>
+              <Variable ID="1004" name="CurrentPhaseC" type="Float" access="read_only"/>
+              <Variable ID="1005" name="VoltagePhaseA" type="Float" access="read_only"/>
+              <Variable ID="1006" name="VoltagePhaseB" type="Float" access="read_only"/>
+              <Variable ID="1007" name="VoltagePhaseC" type="Float" access="read_only"/>
+              <Variable ID="1008" name="PowerFactor" type="Float" access="read_only"/>
+              <Variable ID="1009" name="ActivePower" type="Float" access="read_only"/>
+              <Variable ID="1010" name="ReactivePower" type="Float" access="read_only"/>
+              <Variable ID="1011" name="ApparentPower" type="Float" access="read_only"/>
+              <Variable ID="1012" name="Frequency" type="Float" access="read_only"/>
+              <Variable ID="1013" name="Temperature" type="Float" access="read_only"/>
+              <Variable ID="1014" name="TripCount" type="Int32" access="read_only"/>
+              <Variable ID="1015" name="LastTripTime" type="DateTime" access="read_only"/>
+              <Variable ID="1016" name="TripReason" type="String" access="read_only"/>
+              <Variable ID="1017" name="TripCurrent" type="Float" access="read_only"/>
+              <Variable ID="1018" name="TripDelay" type="Float" access="read_only"/>
+              <Variable ID="1019" name="GroundFaultCurrent" type="Float" access="read_only"/>
+              <Variable ID="1020" name="ArcFaultDetected" type="Boolean" access="read_only"/>
+              <Variable ID="1021" name="MaintenanceDue" type="Boolean" access="read_only"/>
+              <Variable ID="1022" name="OperatingHours" type="Int32" access="read_only"/>
+              <Variable ID="1023" name="LoadPercentage" type="Float" access="read_only"/>
+              <Variable ID="1024" name="HarmonicDistortion" type="Float" access="read_only"/>
+              <Variable ID="1025" name="BreakerPosition" type="Int16" access="read_write"/>
+              <Variable ID="1026" name="RemoteControlEnabled" type="Boolean" access="read_write"/>
+              <Variable ID="1027" name="AutoRecloseEnabled" type="Boolean" access="read_write"/>
+              <Variable ID="1028" name="AutoRecloseAttempts" type="Int16" access="read_write"/>
+              <Variable ID="1029" name="AlarmStatus" type="Int16" access="read_only"/>
+            </Instance>
+          </Object>
+        </ObjectModel>
+      </Protocol>
+      
+      <Protocol name="Modbus" version="1.0" transport="TCP">
+        <ObjectModel>
+          <Object ID="40001" name="HoldingRegisters">
+            <Instance ID="0">
+              <Register ID="40001" name="BreakerStatus" type="Int16" access="read_write"/>
+              <Register ID="40002" name="CurrentPhaseA" type="Float" access="read_only"/>
+              <Register ID="40003" name="CurrentPhaseB" type="Float" access="read_only"/>
+              <Register ID="40004" name="CurrentPhaseC" type="Float" access="read_only"/>
+              <Register ID="40005" name="VoltagePhaseA" type="Float" access="read_only"/>
+              <Register ID="40006" name="VoltagePhaseB" type="Float" access="read_only"/>
+              <Register ID="40007" name="VoltagePhaseC" type="Float" access="read_only"/>
+              <Register ID="40008" name="PowerFactor" type="Float" access="read_only"/>
+              <Register ID="40009" name="ActivePower" type="Float" access="read_only"/>
+              <Register ID="40010" name="ReactivePower" type="Float" access="read_only"/>
+              <Register ID="40011" name="ApparentPower" type="Float" access="read_only"/>
+              <Register ID="40012" name="Frequency" type="Float" access="read_only"/>
+              <Register ID="40013" name="Temperature" type="Float" access="read_only"/>
+              <Register ID="40014" name="TripCount" type="Int32" access="read_only"/>
+              <Register ID="40015" name="LastTripTime" type="Int32" access="read_only"/>
+              <Register ID="40016" name="TripReason" type="Int16" access="read_only"/>
+              <Register ID="40017" name="TripCurrent" type="Float" access="read_only"/>
+              <Register ID="40018" name="TripDelay" type="Float" access="read_only"/>
+              <Register ID="40019" name="GroundFaultCurrent" type="Float" access="read_only"/>
+              <Register ID="40020" name="ArcFaultDetected" type="Int16" access="read_only"/>
+              <Register ID="40021" name="MaintenanceDue" type="Int16" access="read_only"/>
+              <Register ID="40022" name="OperatingHours" type="Int32" access="read_only"/>
+              <Register ID="40023" name="LoadPercentage" type="Float" access="read_only"/>
+              <Register ID="40024" name="HarmonicDistortion" type="Float" access="read_only"/>
+              <Register ID="40025" name="BreakerPosition" type="Int16" access="read_write"/>
+              <Register ID="40026" name="RemoteControlEnabled" type="Int16" access="read_write"/>
+              <Register ID="40027" name="AutoRecloseEnabled" type="Int16" access="read_write"/>
+              <Register ID="40028" name="AutoRecloseAttempts" type="Int16" access="read_write"/>
+              <Register ID="40029" name="AlarmStatus" type="Int16" access="read_only"/>
+            </Instance>
+          </Object>
+        </ObjectModel>
+      </Protocol>
+    </CommunicationProtocols>
+    
+    <DeviceFunctions>
+      <Function name="Monitoring" description="Real-time monitoring of electrical parameters">
+        <Parameter name="UpdateRate" type="Integer" units="ms" default="5000" range="1000-60000"/>
+        <Parameter name="DataFormat" type="String" default="JSON" valid_values="JSON,XML,Binary"/>
+      </Function>
+      
+      <Function name="Protection" description="Circuit protection and fault detection">
+        <Parameter name="OvercurrentPickup" type="Float" units="A" default="100.0" range="50.0-200.0"/>
+        <Parameter name="OvercurrentDelay" type="Float" units="ms" default="100.0" range="50.0-1000.0"/>
+        <Parameter name="GroundFaultPickup" type="Float" units="A" default="5.0" range="1.0-20.0"/>
+        <Parameter name="GroundFaultDelay" type="Float" units="ms" default="200.0" range="100.0-2000.0"/>
+        <Parameter name="ArcFaultDetection" type="Boolean" default="true"/>
+        <Parameter name="ArcFaultSensitivity" type="Integer" units="%" default="80" range="50-100"/>
+      </Function>
+      
+      <Function name="Control" description="Remote control and automation">
+        <Parameter name="RemoteControlEnabled" type="Boolean" default="true"/>
+        <Parameter name="AutoRecloseEnabled" type="Boolean" default="false"/>
+        <Parameter name="AutoRecloseAttempts" type="Integer" default="1" range="0-3"/>
+        <Parameter name="AutoRecloseDelay" type="Float" units="s" default="5.0" range="1.0-30.0"/>
+        <Parameter name="ManualOverride" type="Boolean" default="false"/>
+      </Function>
+      
+      <Function name="Diagnostics" description="Device diagnostics and maintenance">
+        <Parameter name="SelfTestEnabled" type="Boolean" default="true"/>
+        <Parameter name="SelfTestInterval" type="Integer" units="hours" default="24" range="1-168"/>
+        <Parameter name="MaintenanceReminder" type="Boolean" default="true"/>
+        <Parameter name="MaintenanceInterval" type="Integer" units="hours" default="8760" range="1000-17520"/>
+        <Parameter name="EventLogging" type="Boolean" default="true"/>
+        <Parameter name="EventLogSize" type="Integer" units="events" default="1000" range="100-10000"/>
+      </Function>
+    </DeviceFunctions>
+    
+    <DeviceCommands>
+      <Command name="Trip" description="Trip the circuit breaker">
+        <Parameter name="Reason" type="String" description="Reason for tripping" optional="true"/>
+        <Parameter name="Delay" type="Float" units="ms" description="Trip delay" default="0.0" range="0.0-1000.0"/>
+        <Response type="Boolean" description="Trip command success"/>
+      </Command>
+      
+      <Command name="Reset" description="Reset the circuit breaker after trip">
+        <Parameter name="Force" type="Boolean" description="Force reset even if fault exists" default="false"/>
+        <Response type="Boolean" description="Reset command success"/>
+      </Command>
+      
+      <Command name="Close" description="Close the circuit breaker">
+        <Parameter name="Delay" type="Float" units="ms" description="Close delay" default="0.0" range="0.0-1000.0"/>
+        <Response type="Boolean" description="Close command success"/>
+      </Command>
+      
+      <Command name="Open" description="Open the circuit breaker">
+        <Parameter name="Delay" type="Float" units="ms" description="Open delay" default="0.0" range="0.0-1000.0"/>
+        <Response type="Boolean" description="Open command success"/>
+      </Command>
+      
+      <Command name="SetProtectionSettings" description="Update protection settings">
+        <Parameter name="OvercurrentPickup" type="Float" units="A" description="Overcurrent pickup value" range="50.0-200.0"/>
+        <Parameter name="OvercurrentDelay" type="Float" units="ms" description="Overcurrent delay" range="50.0-1000.0"/>
+        <Parameter name="GroundFaultPickup" type="Float" units="A" description="Ground fault pickup value" range="1.0-20.0"/>
+        <Parameter name="GroundFaultDelay" type="Float" units="ms" description="Ground fault delay" range="100.0-2000.0"/>
+        <Response type="Boolean" description="Settings update success"/>
+      </Command>
+      
+      <Command name="GetDiagnostics" description="Retrieve device diagnostics">
+        <Parameter name="IncludeHistory" type="Boolean" description="Include historical data" default="false"/>
+        <Parameter name="MaxEvents" type="Integer" description="Maximum events to return" default="100" range="1-1000"/>
+        <Response type="Object" description="Diagnostic information"/>
+      </Command>
+      
+      <Command name="RunSelfTest" description="Execute device self-test">
+        <Parameter name="TestType" type="String" description="Type of test to run" default="full" valid_values="quick,full,protection,communication"/>
+        <Response type="Object" description="Self-test results"/>
+      </Command>
+      
+      <Command name="ClearEventLog" description="Clear device event log">
+        <Parameter name="Confirm" type="Boolean" description="Confirmation required" default="false"/>
+        <Response type="Boolean" description="Event log cleared"/>
+      </Command>
+    </DeviceCommands>
+    
+    <DeviceAlarms>
+      <Alarm name="OvercurrentTrip" severity="High" description="Circuit breaker tripped due to overcurrent">
+        <Condition>Current > OvercurrentPickup</Condition>
+        <Action>Immediate trip, log event, send notification</Action>
+      </Alarm>
+      
+      <Alarm name="GroundFaultTrip" severity="High" description="Circuit breaker tripped due to ground fault">
+        <Condition>GroundFaultCurrent > GroundFaultPickup</Condition>
+        <Action>Immediate trip, log event, send notification</Action>
+      </Alarm>
+      
+      <Alarm name="ArcFaultDetected" severity="Critical" description="Arc fault detected">
+        <Condition>ArcFaultDetected = true</Condition>
+        <Action>Immediate trip, log event, send notification, require manual reset</Action>
+      </Alarm>
+      
+      <Alarm name="HighTemperature" severity="Medium" description="Device temperature above normal range">
+        <Condition>Temperature > 70°C</Condition>
+        <Action>Log event, send notification, reduce load if possible</Action>
+      </Alarm>
+      
+      <Alarm name="CommunicationLoss" severity="Medium" description="Communication with device lost">
+        <Condition>CommunicationStatus = false</Condition>
+        <Action>Log event, send notification, attempt reconnection</Action>
+      </Alarm>
+      
+      <Alarm name="MaintenanceDue" severity="Low" description="Device maintenance due">
+        <Condition>MaintenanceDue = true</Condition>
+        <Action>Log event, send notification, schedule maintenance</Action>
+      </Alarm>
+      
+      <Alarm name="LowBattery" severity="Low" description="Device battery low">
+        <Condition>BatteryLevel < 20%</Condition>
+        <Action>Log event, send notification, schedule battery replacement</Action>
+      </Alarm>
+    </DeviceAlarms>
+    
+    <DeviceEvents>
+      <Event name="DeviceStartup" description="Device startup and initialization">
+        <Parameter name="StartupTime" type="DateTime" description="Device startup timestamp"/>
+        <Parameter name="FirmwareVersion" type="String" description="Device firmware version"/>
+        <Parameter name="ConfigurationVersion" type="String" description="Device configuration version"/>
+      </Event>
+      
+      <Event name="DeviceShutdown" description="Device shutdown and cleanup">
+        <Parameter name="ShutdownTime" type="DateTime" description="Device shutdown timestamp"/>
+        <Parameter name="ShutdownReason" type="String" description="Reason for shutdown"/>
+        <Parameter name="Uptime" type="Integer" units="seconds" description="Device uptime"/>
+      </Event>
+      
+      <Event name="ProtectionTrip" description="Protection system trip">
+        <Parameter name="TripTime" type="DateTime" description="Trip timestamp"/>
+        <Parameter name="TripReason" type="String" description="Reason for trip"/>
+        <Parameter name="TripCurrent" type="Float" units="A" description="Current at trip"/>
+        <Parameter name="TripDelay" type="Float" units="ms" description="Trip delay"/>
+      </Event>
+      
+      <Event name="ProtectionReset" description="Protection system reset">
+        <Parameter name="ResetTime" type="DateTime" description="Reset timestamp"/>
+        <Parameter name="ResetReason" type="String" description="Reason for reset"/>
+        <Parameter name="ResetBy" type="String" description="Who/what initiated reset"/>
+      </Event>
+      
+      <Event name="ConfigurationChange" description="Device configuration changed">
+        <Parameter name="ChangeTime" type="DateTime" description="Change timestamp"/>
+        <Parameter name="ParameterName" type="String" description="Parameter that changed"/>
+        <Parameter name="OldValue" type="String" description="Previous value"/>
+        <Parameter name="NewValue" type="String" description="New value"/>
+        <Parameter name="ChangedBy" type="String" description="Who/what made the change"/>
+      </Event>
+      
+      <Event name="CommunicationStatus" description="Communication status change">
+        <Parameter name="ChangeTime" type="DateTime" description="Change timestamp"/>
+        <Parameter name="OldStatus" type="Boolean" description="Previous communication status"/>
+        <Parameter name="NewStatus" type="Boolean" description="New communication status"/>
+        <Parameter name="Reason" type="String" description="Reason for status change"/>
+      </Event>
+    </DeviceEvents>
+  </DeviceCapabilities>
+  
+  <DeviceConfiguration>
+    <DefaultSettings>
+      <Setting name="UpdateRate" value="5000" units="ms"/>
+      <Setting name="DataFormat" value="JSON"/>
+      <Setting name="OvercurrentPickup" value="100.0" units="A"/>
+      <Setting name="OvercurrentDelay" value="100.0" units="ms"/>
+      <Setting name="GroundFaultPickup" value="5.0" units="A"/>
+      <Setting name="GroundFaultDelay" value="200.0" units="ms"/>
+      <Setting name="ArcFaultDetection" value="true"/>
+      <Setting name="ArcFaultSensitivity" value="80" units="%"/>
+      <Setting name="RemoteControlEnabled" value="true"/>
+      <Setting name="AutoRecloseEnabled" value="false"/>
+      <Setting name="AutoRecloseAttempts" value="1"/>
+      <Setting name="AutoRecloseDelay" value="5.0" units="s"/>
+      <Setting name="SelfTestEnabled" value="true"/>
+      <Setting name="SelfTestInterval" value="24" units="hours"/>
+      <Setting name="MaintenanceReminder" value="true"/>
+      <Setting name="MaintenanceInterval" value="8760" units="hours"/>
+      <Setting name="EventLogging" value="true"/>
+      <Setting name="EventLogSize" value="1000" units="events"/>
+    </DefaultSettings>
+    
+    <ConfigurationProfiles>
+      <Profile name="Standard" description="Standard protection settings">
+        <Setting name="OvercurrentPickup" value="100.0" units="A"/>
+        <Setting name="OvercurrentDelay" value="100.0" units="ms"/>
+        <Setting name="GroundFaultPickup" value="5.0" units="A"/>
+        <Setting name="GroundFaultDelay" value="200.0" units="ms"/>
+      </Profile>
+      
+      <Profile name="Sensitive" description="Sensitive protection settings">
+        <Setting name="OvercurrentPickup" value="80.0" units="A"/>
+        <Setting name="OvercurrentDelay" value="50.0" units="ms"/>
+        <Setting name="GroundFaultPickup" value="3.0" units="A"/>
+        <Setting name="GroundFaultDelay" value="100.0" units="ms"/>
+      </Profile>
+      
+      <Profile name="Conservative" description="Conservative protection settings">
+        <Setting name="OvercurrentPickup" value="120.0" units="A"/>
+        <Setting name="OvercurrentDelay" value="200.0" units="ms"/>
+        <Setting name="GroundFaultPickup" value="8.0" units="A"/>
+        <Setting name="GroundFaultDelay" value="500.0" units="ms"/>
+      </Profile>
+    </ConfigurationProfiles>
+  </DeviceConfiguration>
+  
+  <DeviceDocumentation>
+    <Manual name="Installation" version="1.0" language="en" format="PDF"/>
+    <Manual name="Operation" version="1.0" language="en" format="PDF"/>
+    <Manual name="Maintenance" version="1.0" language="en" format="PDF"/>
+    <Manual name="Troubleshooting" version="1.0" language="en" format="PDF"/>
+    <DataSheet name="TechnicalSpecifications" version="1.0" language="en" format="PDF"/>
+    <DataSheet name="WiringDiagram" version="1.0" language="en" format="PDF"/>
+  </DeviceDocumentation>
+</FDI>

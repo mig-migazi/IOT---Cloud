@@ -358,6 +358,44 @@
             border-color: #00d4ff;
             box-shadow: 0 10px 30px rgba(0, 212, 255, 0.1);
         }
+        
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        
+        .chart-controls label {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+        
+        .chart-controls select {
+            background: rgba(0, 0, 0, 0.5);
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+            border-radius: 5px;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        
+        .refresh-btn {
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+            border-radius: 5px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .refresh-btn:hover {
+            background: rgba(0, 212, 255, 0.3);
+        }
 
         .chart-card h3 {
             color: #00d4ff;
@@ -756,7 +794,18 @@
         <!-- Message Flow Over Time Chart -->
         <div class="charts-section">
             <div class="chart-card full-width">
-                <h3>📈 Message Flow Over Time</h3>
+                <h3>📊 Historical Message Analysis</h3>
+                <div class="chart-controls">
+                    <label for="timeRange">Time Range:</label>
+                    <select id="timeRange" onchange="updateHistoricalChart()">
+                        <option value="5">Last 5 minutes</option>
+                        <option value="10">Last 10 minutes</option>
+                        <option value="30">Last 30 minutes</option>
+                        <option value="60">Last 1 hour</option>
+                        <option value="120">Last 2 hours</option>
+                    </select>
+                    <button onclick="refreshHistoricalData()" class="refresh-btn">🔄 Refresh</button>
+                </div>
                 <canvas id="messageFlowChart" width="1200" height="300"></canvas>
             </div>
         </div>
@@ -860,6 +909,28 @@
                     <canvas id="smartGridChart" width="1200" height="400"></canvas>
                 </div>
             </div>
+            
+            <!-- Individual Measurement Charts -->
+            <div class="chart-row" style="display: flex; gap: 20px; margin: 20px 0;">
+                <div class="chart-card" style="flex: 1;">
+                    <h4>⚡ Voltage (V)</h4>
+                    <canvas id="voltageChart" width="600" height="300"></canvas>
+                </div>
+                <div class="chart-card" style="flex: 1;">
+                    <h4>🔌 Current (A)</h4>
+                    <canvas id="currentChart" width="600" height="300"></canvas>
+                </div>
+            </div>
+            <div class="chart-row" style="display: flex; gap: 20px; margin: 20px 0;">
+                <div class="chart-card" style="flex: 1;">
+                    <h4>⚡ Power (W)</h4>
+                    <canvas id="powerChart" width="600" height="300"></canvas>
+                </div>
+                <div class="chart-card" style="flex: 1;">
+                    <h4>🌡️ Temperature (°C)</h4>
+                    <canvas id="tempChart" width="600" height="300"></canvas>
+                </div>
+            </div>
 
             <!-- Smart Breaker Messages -->
             <div class="messages-section">
@@ -876,6 +947,9 @@
     <button class="refresh-button" onclick="refreshData()" title="Refresh Data">🔄</button>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <script>
         // Global variables
         let messageCounts = { raw: 0, enriched: 0, trends: 0 };
@@ -887,6 +961,25 @@
             enriched: [],
             trends: []
         };
+        
+        // Track message rates (messages per interval)
+        let messageRates = {
+            raw: 0,
+            enriched: 0,
+            trends: 0
+        };
+        
+        // Track last message counts for rate calculation
+        let lastMessageCounts = {
+            raw: 0,
+            enriched: 0,
+            trends: 0
+        };
+        
+        // Track message processing rate (messages per second)
+        let messageProcessingRate = 0;
+        let lastMessageCount = 0;
+        let lastRateUpdate = Date.now();
 
         // Create animated background particles
         function createParticles() {
@@ -904,45 +997,40 @@
 
         // Initialize charts with dark theme
         function initCharts() {
+            // Main message flow chart
             const ctx = document.getElementById('messageFlowChart');
             if (ctx) {
                 messageFlowChart = new Chart(ctx, {
-                    type: 'line',
+                    type: 'bar',
                     data: {
                         labels: messageFlowData.labels,
                         datasets: [
                             {
                                 label: 'Raw Messages',
                                 data: messageFlowData.raw,
+                                backgroundColor: 'rgba(0, 212, 255, 0.8)',
                                 borderColor: '#00d4ff',
-                                backgroundColor: 'rgba(0, 212, 255, 0.1)',
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.4
+                                borderWidth: 1
                             },
                             {
                                 label: 'Enriched Messages',
                                 data: messageFlowData.enriched,
+                                backgroundColor: 'rgba(0, 255, 136, 0.8)',
                                 borderColor: '#00ff88',
-                                backgroundColor: 'rgba(0, 255, 136, 0.1)',
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.4
+                                borderWidth: 1
                             },
                             {
                                 label: 'Trends Messages',
                                 data: messageFlowData.trends,
+                                backgroundColor: 'rgba(255, 107, 107, 0.8)',
                                 borderColor: '#ff6b6b',
-                                backgroundColor: 'rgba(255, 107, 107, 0.1)',
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.4
+                                borderWidth: 1
                             }
                         ]
                     },
                     options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
+                        responsive: false,           // DISABLE responsive to prevent auto-scaling
+                        maintainAspectRatio: true,  // ENABLE aspect ratio to lock dimensions
                         plugins: {
                             legend: {
                                 labels: {
@@ -964,13 +1052,178 @@
                                 }
                             },
                             y: {
+                                beginAtZero: true,   // FORCE Y-axis to start at 0
+                                min: 0,              // Lock minimum at 0
+                                max: 5,              // Lock maximum at 5 messages per interval
                                 ticks: {
-                                    color: '#888'
+                                    color: '#888',
+                                    stepSize: 1,      // Show ticks every 1 unit
+                                    maxTicksLimit: 6  // Maximum 6 tick marks (0,1,2,3,4,5)
                                 },
                                 grid: {
                                     color: 'rgba(255, 255, 255, 0.1)'
                                 }
                             }
+                        }
+                    }
+                });
+            }
+            
+            // Initialize individual measurement charts
+            initIndividualCharts();
+        }
+        
+        // Initialize individual measurement charts
+        function initIndividualCharts() {
+            // Voltage Chart
+            const voltageCtx = document.getElementById('voltageChart');
+            if (voltageCtx) {
+                new Chart(voltageCtx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Voltage (V)',
+                            data: [],
+                            borderColor: '#00d4ff',
+                            backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { 
+                                    color: '#00d4ff',
+                                    font: { size: 14, weight: 'bold' }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                ticks: { color: '#888', font: { size: 12 } }, 
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' } 
+                            },
+                            y: { 
+                                ticks: { color: '#888', font: { size: 12 } }, 
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' } 
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Current Chart
+            const currentCtx = document.getElementById('currentChart');
+            if (currentCtx) {
+                new Chart(currentCtx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Current (A)',
+                            data: [],
+                            borderColor: '#00ff88',
+                            backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { 
+                                    color: '#00ff88',
+                                    font: { size: 14, weight: 'bold' }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                ticks: { color: '#888', font: { size: 12 } }, 
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' } 
+                            },
+                            y: { 
+                                ticks: { color: '#888', font: { size: 12 } }, 
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' } 
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Power Chart
+            const powerCtx = document.getElementById('powerChart');
+            if (powerCtx) {
+                new Chart(powerCtx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Power (W)',
+                            data: [],
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#ff6b6b' }
+                            }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#888' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                            y: { ticks: { color: '#888' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+                        }
+                    }
+                });
+            }
+            
+            // Temperature Chart
+            const tempCtx = document.getElementById('tempChart');
+            if (tempCtx) {
+                new Chart(tempCtx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Temperature (°C)',
+                            data: [],
+                            borderColor: '#ffa500',
+                            backgroundColor: 'rgba(255, 165, 0, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#ffa500' }
+                            }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#888' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                            y: { ticks: { color: '#888' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
                         }
                     }
                 });
@@ -1011,11 +1264,14 @@
             if (!timestamp) return 'N/A';
             try {
                 const date = new Date(timestamp);
-                // Force conversion to actual local timezone (not browser default)
-                const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
                 
-                // Format with explicit local timezone
-                return localDate.toLocaleString('en-US', {
+                // Check if the date is valid
+                if (isNaN(date.getTime())) {
+                    return timestamp; // Return original if invalid
+                }
+                
+                // Format with current timezone (no manual conversion needed)
+                return date.toLocaleString('en-US', {
                     year: 'numeric',
                     month: '2-digit',
                     day: '2-digit',
@@ -1023,8 +1279,10 @@
                     minute: '2-digit',
                     second: '2-digit',
                     hour12: true
-                }) + ' (Local Time)';
+                    // REMOVED timeZoneName: 'short' - this was causing EDT display!
+                });
             } catch (e) {
+                console.error('Timestamp formatting error:', e, timestamp);
                 return timestamp;
             }
         }
@@ -1068,13 +1326,22 @@
         // Update metrics
         function updateMetrics() {
             // System Performance Metrics
-            const now = new Date();
-            const startTime = new Date('2025-08-20T10:00:00'); // Simulated start time
-            const uptimeHours = Math.round((now - startTime) / (1000 * 60 * 60));
+            const currentTime = new Date();
+            const startTime = new Date(); // Use current time instead of fake 2025 date
+            const uptimeHours = Math.round((currentTime - startTime) / (1000 * 60 * 60));
             
             // Calculate message processing rate (messages per second)
-            const processingRate = messageCounts.raw > 0 ? 
-                (messageCounts.raw / uptimeHours / 3600).toFixed(2) : '0.00';
+            const now = Date.now();
+            const timeDiff = (now - lastRateUpdate) / 1000; // seconds
+            
+            if (timeDiff > 0 && messageCounts.raw > lastMessageCount) {
+                const newMessages = messageCounts.raw - lastMessageCount;
+                messageProcessingRate = (newMessages / timeDiff).toFixed(2);
+                lastMessageCount = messageCounts.raw;
+                lastRateUpdate = now;
+            }
+            
+            const processingRate = messageProcessingRate > 0 ? messageProcessingRate : '0.00';
             
             // Calculate enrichment latency (simulated based on message flow)
             const enrichmentLatency = messageCounts.enriched > 0 ? 
@@ -1141,38 +1408,78 @@
             container.innerHTML = html;
         }
 
-        // Update charts
+        // COMPLETELY REWRITTEN - WORKING CHART UPDATE
         function updateCharts() {
-            if (messageFlowChart) {
-                // Add current timestamp
-                const now = new Date();
-                const timeLabel = now.toLocaleTimeString('en-US', { 
-                    hour12: false, 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit' 
-                });
+            if (!messageFlowChart) return;
+            
+            // Get current time for label
+            const now = new Date();
+            const timeLabel = now.toLocaleTimeString('en-US', { 
+                hour12: true, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit'
+            });
+            
+            // Calculate rates (difference since last update)
+            const rawRate = Math.max(0, messageCounts.raw - lastMessageCounts.raw);
+            const enrichedRate = Math.max(0, messageCounts.enriched - lastMessageCounts.enriched);
+            const trendsRate = Math.max(0, messageCounts.trends - lastMessageCounts.trends);
+            
+            // HARD CAP - never allow values above 5
+            const cappedRawRate = Math.min(rawRate, 5);
+            const cappedEnrichedRate = Math.min(enrichedRate, 5);
+            const cappedTrendsRate = Math.min(trendsRate, 5);
+            
+            // Update for next calculation
+            lastMessageCounts.raw = messageCounts.raw;
+            lastMessageCounts.enriched = messageCounts.enriched;
+            lastMessageCounts.trends = messageCounts.trends;
+            
+            // Add new data point
+            messageFlowData.labels.push(timeLabel);
+            messageFlowData.raw.push(cappedRawRate);
+            messageFlowData.enriched.push(cappedEnrichedRate);
+            messageFlowData.trends.push(cappedTrendsRate);
+            
+            // Keep only last 8 data points (smaller for better performance)
+            if (messageFlowData.labels.length > 8) {
+                messageFlowData.labels.shift();
+                messageFlowData.raw.shift();
+                messageFlowData.enriched.shift();
+                messageFlowData.trends.shift();
+            }
+            
+                        // Update existing chart data (no more destroy/recreate!)
+            messageFlowChart.data.labels = messageFlowData.labels;
+            messageFlowChart.data.datasets[0].data = messageFlowData.raw;
+            messageFlowChart.data.datasets[1].data = messageFlowData.enriched;
+            messageFlowChart.data.datasets[2].data = messageFlowData.trends;
+            
+            // Force Y-axis settings on existing chart
+            messageFlowChart.options.scales.y.min = 0;
+            messageFlowChart.options.scales.y.max = 5;
+            
+            messageFlowChart.update('none');
+        }
+
+        // REMOVED: updateChartData function was conflicting with updateCharts
+
+        // Reset chart data periodically to prevent accumulation
+        function resetChartData() {
+            if (messageFlowData.labels.length > 20) {
+                // Keep only last 10 data points to prevent excessive growth
+                messageFlowData.labels = messageFlowData.labels.slice(-10);
+                messageFlowData.raw = messageFlowData.raw.slice(-10);
+                messageFlowData.enriched = messageFlowData.enriched.slice(-10);
+                messageFlowData.trends = messageFlowData.trends.slice(-10);
                 
-                // Add new data points
-                messageFlowData.labels.push(timeLabel);
-                messageFlowData.raw.push(messageCounts.raw);
-                messageFlowData.enriched.push(messageCounts.enriched);
-                messageFlowData.trends.push(messageCounts.trends);
+                // Reset message counts to prevent rate calculation issues
+                lastMessageCounts.raw = messageCounts.raw;
+                lastMessageCounts.enriched = messageCounts.enriched;
+                lastMessageCounts.trends = messageCounts.trends;
                 
-                // Keep only last 20 data points for performance
-                if (messageFlowData.labels.length > 20) {
-                    messageFlowData.labels.shift();
-                    messageFlowData.raw.shift();
-                    messageFlowData.enriched.shift();
-                    messageFlowData.trends.shift();
-                }
-                
-                // Update chart
-                messageFlowChart.data.labels = messageFlowData.labels;
-                messageFlowChart.data.datasets[0].data = messageFlowData.raw;
-                messageFlowChart.data.datasets[1].data = messageFlowData.enriched;
-                messageFlowChart.data.datasets[2].data = messageFlowData.trends;
-                messageFlowChart.update('none'); // Update without animation for performance
+                console.log('Chart data reset to prevent accumulation');
             }
         }
 
@@ -1204,7 +1511,11 @@
                 // Update all displays
                 updateStatusIndicators();
                 updateMetrics();
-                updateCharts();
+                
+                // Only update chart if we have new messages
+                if (data.raw_messages.length > 0 || data.enriched_messages.length > 0) {
+                    updateCharts();
+                }
 
             } catch (error) {
                 console.error('Error fetching messages:', error);
@@ -1242,7 +1553,23 @@
                 if (msg._kafka_info?.message_type === 'trends') {
                     summary = `Trends: ${msg.trends?.length || 0} data points`;
                 } else if (msg.measurements) {
-                    summary = `Measurements: ${Object.keys(msg.measurements).length} types`;
+                    // Extract actual values from nested measurements
+                    const measurementValues = [];
+                    Object.entries(msg.measurements).forEach(([key, value]) => {
+                        if (typeof value === 'object' && value !== null) {
+                            // Handle nested objects like voltage.phase_a
+                            if (value.value !== undefined) {
+                                measurementValues.push(`${key}: ${value.value}${value.unit || ''}`);
+                            } else if (value.phase_a !== undefined) {
+                                measurementValues.push(`${key}: ${value.phase_a}${value.unit || ''}`);
+                            } else {
+                                measurementValues.push(`${key}: ${Object.keys(value).length} values`);
+                            }
+                        } else {
+                            measurementValues.push(`${key}: ${value}`);
+                        }
+                    });
+                    summary = `Measurements: ${measurementValues.slice(0, 3).join(', ')}${measurementValues.length > 3 ? '...' : ''}`;
                 } else if (msg.trends) {
                     summary = `Trends: ${msg.trends?.length || 0} data points`;
                 } else {
@@ -1499,10 +1826,38 @@
             // Update measurement ranges
             const telemetryMessages = messages.filter(m => m.event_type === 'telemetry' && m.measurements);
             if (telemetryMessages.length > 0) {
-                const voltages = telemetryMessages.map(m => m.measurements.voltage).filter(v => v !== undefined);
-                const currents = telemetryMessages.map(m => m.measurements.current).filter(c => c !== undefined);
-                const powers = telemetryMessages.map(m => m.measurements.power).filter(p => p !== undefined);
-                const temps = telemetryMessages.map(m => m.measurements.temperature).filter(t => t !== undefined);
+                // Extract actual values from nested measurement objects
+                const voltages = telemetryMessages.map(m => {
+                    const v = m.measurements.voltage;
+                    if (v && typeof v === 'object') {
+                        return v.phase_a || v.value || 0;
+                    }
+                    return v || 0;
+                }).filter(v => v !== undefined && !isNaN(v));
+                
+                const currents = telemetryMessages.map(m => {
+                    const c = m.measurements.current;
+                    if (c && typeof c === 'object') {
+                        return c.phase_a || c.value || 0;
+                    }
+                    return c || 0;
+                }).filter(c => c !== undefined && !isNaN(c));
+                
+                const powers = telemetryMessages.map(m => {
+                    const p = m.measurements.power;
+                    if (p && typeof p === 'object') {
+                        return p.active || p.value || 0;
+                    }
+                    return p || 0;
+                }).filter(p => p !== undefined && !isNaN(p));
+                
+                const temps = telemetryMessages.map(m => {
+                    const t = m.measurements.temperature;
+                    if (t && typeof t === 'object') {
+                        return t.value || 0;
+                    }
+                    return t || 0;
+                }).filter(t => t !== undefined && !isNaN(t));
 
                 if (voltages.length > 0) {
                     const minV = Math.min(...voltages);
@@ -1512,7 +1867,7 @@
                 if (currents.length > 0) {
                     const minC = Math.min(...currents);
                     const maxC = Math.max(...currents);
-                    document.getElementById('smart-grid-current').textContent = `${minC.toFixed(1)} - ${minC.toFixed(1)}`;
+                    document.getElementById('smart-grid-current').textContent = `${minC.toFixed(1)} - ${maxC.toFixed(1)}`;
                 }
                 if (powers.length > 0) {
                     const minP = Math.min(...powers);
@@ -1553,11 +1908,22 @@
                 const timestamp = new Date(msg.timestamp).toLocaleTimeString();
                 const measurements = msg.measurements;
                 
+                // Extract actual values from nested measurement objects
+                const voltage = measurements.voltage && typeof measurements.voltage === 'object' ? 
+                    (measurements.voltage.phase_a || measurements.voltage.value || 0) : (measurements.voltage || 0);
+                const current = measurements.current && typeof measurements.current === 'object' ? 
+                    (measurements.current.phase_a || measurements.current.value || 0) : (measurements.current || 0);
+                const power = measurements.power && typeof measurements.power === 'object' ? 
+                    (measurements.power.active || measurements.power.value || 0) : (measurements.power || 0);
+                const temperature = measurements.temperature && typeof measurements.temperature === 'object' ? 
+                    (measurements.temperature.value || 0) : (measurements.temperature || 0);
+                
+                // Add all values (including 0) to show the real data
                 smartGridData.labels.push(timestamp);
-                smartGridData.voltage.push(measurements.voltage || 0);
-                smartGridData.current.push(measurements.current || 0);
-                smartGridData.power.push(measurements.power || 0);
-                smartGridData.temperature.push(measurements.temperature || 0);
+                smartGridData.voltage.push(voltage);
+                smartGridData.current.push(current);
+                smartGridData.power.push(power);
+                smartGridData.temperature.push(temperature);
 
                 // Keep only last 20 data points
                 if (smartGridData.labels.length > 20) {
@@ -1569,13 +1935,50 @@
                 }
             });
 
-            // Update chart
+            // Update main chart
             smartGridChart.data.labels = smartGridData.labels;
             smartGridChart.data.datasets[0].data = smartGridData.voltage;
             smartGridChart.data.datasets[1].data = smartGridData.current;
             smartGridChart.data.datasets[2].data = smartGridData.power;
             smartGridChart.data.datasets[3].data = smartGridData.temperature;
             smartGridChart.update('none');
+
+            // Update individual charts
+            updateIndividualCharts();
+        }
+
+        function updateIndividualCharts() {
+            // Update Voltage Chart
+            const voltageChart = Chart.getChart('voltageChart');
+            if (voltageChart && smartGridData.voltage.length > 0) {
+                voltageChart.data.labels = smartGridData.labels;
+                voltageChart.data.datasets[0].data = smartGridData.voltage;
+                voltageChart.update('none');
+            }
+
+            // Update Current Chart
+            const currentChart = Chart.getChart('currentChart');
+            if (currentChart && smartGridData.current.length > 0) {
+                currentChart.data.labels = smartGridData.labels;
+                currentChart.data.datasets[0].data = smartGridData.current;
+                currentChart.update('none');
+            }
+
+            // Update Power Chart
+            const powerChart = Chart.getChart('powerChart');
+            if (powerChart && smartGridData.power.length > 0) {
+                powerChart.data.labels = smartGridData.labels;
+                powerChart.data.datasets[0].data = smartGridData.power;
+                powerChart.update('none');
+            }
+
+            // Update Temperature Chart
+            const tempChart = Chart.getChart('tempChart');
+            if (tempChart && smartGridData.temperature.length > 0) {
+                tempChart.data.labels = smartGridData.labels;
+                tempChart.data.datasets[0].data = smartGridData.temperature;
+                tempChart.update('none');
+            }
         }
 
         function updateSmartGridMessages(messages) {
@@ -1590,14 +1993,33 @@
             
             let html = '';
             recentMessages.forEach(msg => {
-                const timestamp = new Date(msg.timestamp).toLocaleString();
+                const timestamp = new Date(msg.timestamp).toLocaleString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                    // NO timezone info - use local time
+                });
                 const deviceId = msg.device_id || 'N/A';
                 const eventType = msg.event_type || 'unknown';
                 
                 let summary = '';
                 if (msg.measurements) {
                     const measurements = msg.measurements;
-                    summary = `Voltage: ${measurements.voltage || 'N/A'}V, Current: ${measurements.current || 'N/A'}A, Power: ${measurements.power || 'N/A'}W, Temp: ${measurements.temperature || 'N/A'}°C`;
+                    // Extract actual values from nested measurement objects
+                    const voltage = measurements.voltage && typeof measurements.voltage === 'object' ? 
+                        (measurements.voltage.phase_a || measurements.voltage.value || 'N/A') : (measurements.voltage || 'N/A');
+                    const current = measurements.current && typeof measurements.current === 'object' ? 
+                        (measurements.current.phase_a || measurements.current.value || 'N/A') : (measurements.current || 'N/A');
+                    const power = measurements.power && typeof measurements.power === 'object' ? 
+                        (measurements.power.active || measurements.power.value || 'N/A') : (measurements.power || 'N/A');
+                    const temp = measurements.temperature && typeof measurements.temperature === 'object' ? 
+                        (measurements.temperature.value || 'N/A') : (measurements.temperature || 'N/A');
+                    
+                    summary = `Voltage: ${voltage}V, Current: ${current}A, Power: ${power}W, Temp: ${temp}°C`;
                 } else if (msg.trends) {
                     summary = `Trends: ${msg.trends.length || 0} data points`;
                 } else {
@@ -1631,12 +2053,101 @@
             // Auto-refresh every 5 seconds
             setInterval(fetchMessages, 5000);
             
+            // Update chart every 3 seconds for better performance
+            setInterval(() => {
+                if (messageFlowChart) {
+                    // Update chart less frequently to avoid performance issues
+                    updateCharts();
+                }
+            }, 3000);
+            
+            // Reset chart data periodically to prevent accumulation
+            setInterval(resetChartData, 30000); // Reset every 30 seconds
+            
             // Refresh app registrations every 30 seconds
             setInterval(fetchAppRegistrations, 30000);
         }
 
+        // Historical chart functions
+        function updateHistoricalChart() {
+            const timeRange = document.getElementById('timeRange').value;
+            console.log('Updating chart for time range:', timeRange, 'minutes');
+            fetchHistoricalData(timeRange);
+        }
+        
+        function refreshHistoricalData() {
+            const timeRange = document.getElementById('timeRange').value;
+            console.log('Refreshing data for time range:', timeRange, 'minutes');
+            fetchHistoricalData(timeRange);
+        }
+        
+        async function fetchHistoricalData(minutes) {
+            try {
+                const response = await fetch(`/api/messages?minutes=${minutes}`);
+                const data = await response.json();
+                
+                // Process historical data
+                processHistoricalData(data, minutes);
+                
+            } catch (error) {
+                console.error('Error fetching historical data:', error);
+            }
+        }
+        
+        function processHistoricalData(data, minutes) {
+            // Group messages by time buckets
+            const timeBuckets = {};
+            const bucketSize = Math.max(1, Math.floor(minutes / 10)); // 10 buckets max
+            
+            data.raw_messages.forEach(msg => {
+                const timestamp = new Date(msg.timestamp);
+                const bucket = Math.floor(timestamp.getTime() / (bucketSize * 60 * 1000));
+                if (!timeBuckets[bucket]) timeBuckets[bucket] = { raw: 0, enriched: 0, trends: 0 };
+                timeBuckets[bucket].raw++;
+            });
+            
+            data.enriched_messages.forEach(msg => {
+                const timestamp = new Date(msg.timestamp);
+                const bucket = Math.floor(timestamp.getTime() / (bucketSize * 60 * 1000));
+                if (!timeBuckets[bucket]) timeBuckets[bucket] = { raw: 0, enriched: 0, trends: 0 };
+                timeBuckets[bucket].enriched++;
+            });
+            
+            // Update chart with historical data
+            updateChartWithHistoricalData(timeBuckets, minutes);
+        }
+        
+        function updateChartWithHistoricalData(timeBuckets, minutes) {
+            if (!messageFlowChart) return;
+            
+            const buckets = Object.keys(timeBuckets).sort((a, b) => parseInt(a) - parseInt(b));
+            const labels = buckets.map(bucket => {
+                const time = new Date(parseInt(bucket) * (Math.max(1, Math.floor(minutes / 10)) * 60 * 1000);
+                return time.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' });
+            });
+            
+            const rawData = buckets.map(bucket => timeBuckets[bucket].raw);
+            const enrichedData = buckets.map(bucket => timeBuckets[bucket].enriched);
+            const trendsData = buckets.map(bucket => timeBuckets[bucket].trends);
+            
+            // Update chart data
+            messageFlowChart.data.labels = labels;
+            messageFlowChart.data.datasets[0].data = rawData;
+            messageFlowChart.data.datasets[1].data = enrichedData;
+            messageFlowChart.data.datasets[2].data = trendsData;
+            
+            // Update chart
+            messageFlowChart.update('none');
+        }
+        
         // Start dashboard when page loads
         document.addEventListener('DOMContentLoaded', initDashboard);
+        
+        // Force reload every 5 minutes to prevent cache issues
+        setInterval(() => {
+            console.log('Forcing page reload to prevent cache issues');
+            window.location.reload(true);
+        }, 300000); // 5 minutes
     </script>
 </body>
 </html>

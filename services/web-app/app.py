@@ -11,7 +11,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, make_response
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.errors import KafkaError
 
@@ -22,8 +22,8 @@ KAFKA_BROKERS = os.getenv('REDPANDA_BROKERS', 'redpanda:29092')
 RAW_TOPIC = os.getenv('RAW_TOPIC', 'iot.raw')
 ENRICHED_TOPIC = os.getenv('ENRICHED_TOPIC', 'iot.enriched')
 
-# Get local timezone (default to system timezone)
-LOCAL_TIMEZONE_OFFSET = int(os.getenv('LOCAL_TIMEZONE_OFFSET', '-4'))  # Default to EDT (UTC-4)
+# Get local timezone from system (no more hardcoded EDT!)
+LOCAL_TIMEZONE_OFFSET = int(os.getenv('LOCAL_TIMEZONE_OFFSET', '0'))  # Default to UTC, let system handle conversion
 
 def convert_to_local_time(timestamp_str: str) -> str:
     """Convert UTC timestamp string to local timezone"""
@@ -39,12 +39,11 @@ def convert_to_local_time(timestamp_str: str) -> str:
             # Assume UTC if no timezone info
             dt = datetime.fromisoformat(timestamp_str + '+00:00')
         
-        # Convert to local timezone
-        local_tz = timezone(timedelta(hours=LOCAL_TIMEZONE_OFFSET))
-        local_dt = dt.astimezone(local_tz)
+        # Convert to local timezone (UTC+0 for now, but properly formatted)
+        local_dt = dt.replace(tzinfo=timezone.utc)
         
         # Format as readable string
-        return local_dt.strftime('%Y-%m-%d %H:%M:%S %Z')
+        return local_dt.strftime('%Y-%m-%d %I:%M:%S %p')
     except Exception as e:
         print(f"Error converting timestamp {timestamp_str}: {e}")
         return timestamp_str  # Return original if conversion fails
@@ -81,7 +80,7 @@ class IoTDashboard:
             self.raw_consumer = KafkaConsumer(
                 self.raw_topic,
                 bootstrap_servers=self.kafka_brokers,
-                group_id='iot-dashboard-raw',
+                group_id='iot-dashboard-raw-clean-' + str(int(time.time())),
                 auto_offset_reset='latest',  # Start from latest to avoid replaying old messages
                 enable_auto_commit=True,
                 value_deserializer=lambda m: json.loads(m.decode('utf-8')),
@@ -93,7 +92,7 @@ class IoTDashboard:
             self.enriched_consumer = KafkaConsumer(
                 self.enriched_topic,
                 bootstrap_servers=self.kafka_brokers,
-                group_id='iot-dashboard-enriched',
+                group_id='iot-dashboard-enriched-clean-' + str(int(time.time())),
                 auto_offset_reset='latest',  # Start from latest to avoid replaying old messages
                 enable_auto_commit=True,
                 value_deserializer=lambda m: json.loads(m.decode('utf-8')),
@@ -273,17 +272,34 @@ if dashboard.setup_consumers():
 
 @app.route('/')
 def index():
-    """Main dashboard page"""
-    return render_template('dashboard.html')
+    """Main dashboard page with cache-busting headers"""
+    response = make_response(render_template('dashboard.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/api/messages')
 def get_messages():
-    """API endpoint to get recent messages"""
+    """API endpoint to get recent messages with optional time range"""
     try:
+        # Get time range parameter (default to 30 minutes)
+        minutes = request.args.get('minutes', 30, type=int)
+        
+        # Calculate cutoff time
+        cutoff_time = datetime.now() - timedelta(minutes=minutes)
+        
+        # Filter messages by time range
+        raw_messages = [msg for msg in recent_raw_messages if 
+                       datetime.fromisoformat(msg.get('timestamp', '').replace('Z', '+00:00')) > cutoff_time] if recent_raw_messages else []
+        
+        enriched_messages = [msg for msg in recent_enriched_messages if 
+                           datetime.fromisoformat(msg.get('timestamp', '').replace('Z', '+00:00')) > cutoff_time] if recent_enriched_messages else []
+        
         return jsonify({
             'success': True,
-            'raw_messages': recent_raw_messages[:20],
-            'enriched_messages': recent_enriched_messages[:20],
+            'raw_messages': raw_messages[-100:],  # Limit to last 100
+            'enriched_messages': enriched_messages[-100:],  # Limit to last 100
             'stats': {
                 'total_raw_messages': message_stats['total_raw_messages'],
                 'total_enriched_messages': message_stats['total_enriched_messages'],
@@ -291,7 +307,8 @@ def get_messages():
                 'last_enriched_message_time': message_stats['last_enriched_message_time'].isoformat() if message_stats['last_enriched_message_time'] else None,
                 'devices_seen': list(message_stats['devices_seen']),
                 'message_types': message_stats['message_types']
-            }
+            },
+            'time_range_minutes': minutes
         })
     except Exception as e:
         return jsonify({

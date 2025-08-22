@@ -7,7 +7,8 @@ Bridges MQTT topics to RedPanda/Kafka topics for IoT data ingestion
 import os
 import json
 import logging
-import asyncio
+import time
+# import asyncio  # Removed - not needed
 from typing import Dict, Any
 import paho.mqtt.client as mqtt
 from kafka import KafkaProducer
@@ -44,6 +45,30 @@ class MQTTKafkaBridge:
         self.mqtt_topics = os.getenv('MQTT_TOPICS', 'iot/+/raw').split(',')
         self.kafka_brokers = os.getenv('KAFKA_BROKERS', 'redpanda:29092').split(',')
         self.kafka_topic = os.getenv('KAFKA_TOPIC', 'iot.raw')
+        
+        # Debug: Try to resolve hostname
+        import socket
+        try:
+            host, port = self.mqtt_broker.split(':')
+            ip = socket.gethostbyname(host)
+            logger.info(f"Resolved {host} to {ip}")
+        except Exception as e:
+            logger.error(f"Failed to resolve {host}: {e}")
+            # Fallback to IP if hostname resolution fails
+            if host == 'mqtt-broker':
+                # Try to get IP from Docker network
+                try:
+                    import subprocess
+                    result = subprocess.run(['getent', 'hosts', 'mqtt-broker'], 
+                                         capture_output=True, text=True)
+                    if result.returncode == 0:
+                        ip = result.stdout.strip().split()[0]
+                        self.mqtt_broker = f"{ip}:{port}"
+                        logger.info(f"Using IP fallback: {self.mqtt_broker}")
+                except Exception as e2:
+                    logger.error(f"IP fallback also failed: {e2}")
+        except Exception as e:
+            logger.error(f"Unexpected error in hostname resolution: {e}")
         
         # MQTT client
         self.mqtt_client = mqtt.Client()
@@ -105,7 +130,7 @@ class MQTTKafkaBridge:
         """Callback when MQTT message is received"""
         try:
             self.stats['messages_received'] += 1
-            self.stats['last_message_time'] = asyncio.get_event_loop().time()
+            self.stats['last_message_time'] = time.time()
             
             logger.info("MQTT message received", 
                        topic=msg.topic,
@@ -131,7 +156,7 @@ class MQTTKafkaBridge:
                     "topic": msg.topic,
                     "qos": msg.qos,
                     "retain": msg.retain,
-                    "timestamp": asyncio.get_event_loop().time()
+                    "timestamp": time.time()
                 }
             }
             
@@ -198,9 +223,37 @@ class MQTTKafkaBridge:
             # Setup Kafka producer
             self.setup_kafka_producer()
             
+            # Debug: Try to resolve hostname and use IP if needed
+            host, port = self.mqtt_broker.split(':')
+            try:
+                import socket
+                ip = socket.gethostbyname(host)
+                logger.info(f"Resolved {host} to {ip}")
+                # Use IP address instead of hostname
+                mqtt_broker_ip = f"{ip}:{port}"
+            except Exception as e:
+                logger.error(f"Failed to resolve {host}: {e}")
+                # Try to get IP from Docker network
+                try:
+                    import subprocess
+                    result = subprocess.run(['getent', 'hosts', host], 
+                                         capture_output=True, text=True)
+                    if result.returncode == 0:
+                        ip = result.stdout.strip().split()[0]
+                        mqtt_broker_ip = f"{ip}:{port}"
+                        logger.info(f"Using IP fallback: {mqtt_broker_ip}")
+                    else:
+                        mqtt_broker_ip = self.mqtt_broker
+                        logger.warning(f"Could not resolve {host}, using original: {mqtt_broker_ip}")
+                except Exception as e2:
+                    logger.error(f"IP fallback also failed: {e2}")
+                    mqtt_broker_ip = self.mqtt_broker
+            
             # Connect to MQTT broker
-            logger.info("Connecting to MQTT broker", broker=self.mqtt_broker)
-            self.mqtt_client.connect(self.mqtt_broker, 1883, 60)
+            logger.info("Connecting to MQTT broker", broker=mqtt_broker_ip)
+            # Extract host from mqtt_broker_ip (which includes port)
+            mqtt_host = mqtt_broker_ip.split(':')[0]
+            self.mqtt_client.connect(mqtt_host, 1883, 60)
             
             # Start MQTT client loop
             self.mqtt_client.loop_start()
@@ -210,7 +263,7 @@ class MQTTKafkaBridge:
             # Keep the service running
             try:
                 while True:
-                    asyncio.sleep(1)
+                    time.sleep(1)
                     # Log statistics every 30 seconds
                     if self.stats['messages_received'] % 30 == 0 and self.stats['messages_received'] > 0:
                         logger.info("Bridge statistics", stats=self.stats)

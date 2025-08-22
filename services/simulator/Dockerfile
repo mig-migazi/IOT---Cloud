@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy service code
-COPY smart_breaker_simulator.py .
+COPY *.py .
 
-# Run the service
+# Run the service (will be overridden by docker-compose command)
 CMD ["python", "smart_breaker_simulator.py"]

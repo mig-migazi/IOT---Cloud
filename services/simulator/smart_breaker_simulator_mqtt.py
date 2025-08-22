@@ -11,26 +11,10 @@ from datetime import datetime
 import paho.mqtt.client as mqtt
 import structlog
 
-# Configure structured logging
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
-    ],
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    wrapper_class=structlog.stdlib.BoundLogger,
-    cache_logger_on_first_use=True,
-)
-
-logger = structlog.get_logger()
+# Simple logging setup
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class MQTTSmartBreakerSimulator:
     """MQTT-based Smart Breaker Simulator"""
@@ -66,10 +50,7 @@ class MQTTSmartBreakerSimulator:
             'last_message_time': None
         }
         
-        logger.info("MQTT Smart Breaker Simulator initialized", 
-                   device_id=self.device_id,
-                   mqtt_broker=self.mqtt_broker,
-                   telemetry_topic=self.telemetry_topic)
+        logger.info(f"MQTT Smart Breaker Simulator initialized - device_id: {self.device_id}, mqtt_broker: {self.mqtt_broker}, telemetry_topic: {self.telemetry_topic}")
     
     def on_mqtt_connect(self, client, userdata, flags, rc):
         """Callback when MQTT client connects"""
@@ -77,11 +58,11 @@ class MQTTSmartBreakerSimulator:
             logger.info("Connected to MQTT broker successfully")
             self.stats['last_message_time'] = time.time()
         else:
-            logger.error("Failed to connect to MQTT broker", return_code=rc)
+            logger.error(f"Failed to connect to MQTT broker, return_code: {rc}")
     
     def on_mqtt_disconnect(self, client, userdata, rc):
         """Callback when MQTT client disconnects"""
-        logger.warning("Disconnected from MQTT broker", return_code=rc)
+        logger.warning(f"Disconnected from MQTT broker, return_code: {rc}")
         if rc != 0:
             logger.info("Attempting to reconnect...")
     
@@ -92,7 +73,7 @@ class MQTTSmartBreakerSimulator:
     def connect_mqtt(self):
         """Connect to MQTT broker"""
         try:
-            logger.info("Connecting to MQTT broker", broker=self.mqtt_broker, port=self.mqtt_port)
+            logger.info(f"Connecting to MQTT broker {self.mqtt_broker}:{self.mqtt_port}")
             self.mqtt_client.connect(self.mqtt_broker, self.mqtt_port, 60)
             self.mqtt_client.loop_start()
             return True
@@ -105,7 +86,7 @@ class MQTTSmartBreakerSimulator:
         return {
             "device_id": self.device_id,
             "device_type": self.device_type,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "event_type": "telemetry",
             "measurements": {
                 "voltage": {
@@ -176,7 +157,7 @@ class MQTTSmartBreakerSimulator:
         return {
             "device_id": self.device_id,
             "device_type": self.device_type,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "event_type": "trends",
             "trends": trends
         }
@@ -207,10 +188,7 @@ class MQTTSmartBreakerSimulator:
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
                 self.stats['messages_sent'] += 1
                 self.stats['last_message_time'] = time.time()
-                logger.info("Message published successfully", 
-                           topic=topic,
-                           message_size=len(message),
-                           qos=qos)
+                logger.info(f"Message published successfully - topic: {topic}, message_size: {len(message)}, qos: {qos}")
                 return True
             else:
                 logger.error("Failed to publish message", 

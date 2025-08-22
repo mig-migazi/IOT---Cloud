@@ -1,0 +1,143 @@
+// Sparkplug B Protocol Buffer Definition
+// Version 1.0 - Compact and extensible binary format for MQTT payloads
+syntax = "proto3";
+
+package org.eclipse.tahu.protobuf;
+
+option java_package = "org.eclipse.tahu.protobuf";
+option java_outer_classname = "SparkplugBProto";
+
+message Payload {
+    uint64 timestamp = 1;           // Timestamp in milliseconds since epoch
+    repeated Metric metrics = 2;    // Array of metrics/telemetry data
+    uint64 seq = 3;                 // Sequence number for ordering
+    string uuid = 4;                // UUID for message correlation
+    bytes body = 5;                 // Additional payload body
+}
+
+message Metric {
+    string name = 1;                // Metric name/identifier
+    uint64 alias = 2;               // Alias for name compression
+    uint64 timestamp = 3;           // Metric-specific timestamp
+    uint32 datatype = 4;            // Data type identifier
+    bool is_historical = 5;         // Historical data flag
+    bool is_transient = 6;          // Transient data flag
+    bool is_null = 7;               // Null value indicator
+    MetaData metadata = 8;          // Metric metadata
+    PropertySet properties = 9;     // Additional properties
+
+    // Value types - only one should be set based on datatype
+    uint32 int_value = 10;
+    uint64 long_value = 11;
+    float float_value = 12;
+    double double_value = 13;
+    bool boolean_value = 14;
+    string string_value = 15;
+    bytes bytes_value = 16;
+    DataSet dataset_value = 17;
+    Template template_value = 18;
+}
+
+message MetaData {
+    bool is_multi_part = 1;         // Multi-part message flag
+    string content_type = 2;        // Content type
+    uint64 size = 3;                // Data size
+    uint64 seq = 4;                 // Sequence number
+    string file_name = 5;           // File name for file transfers
+    string file_type = 6;           // File type
+    string md5 = 7;                 // MD5 checksum
+    string description = 8;         // Description
+}
+
+message PropertySet {
+    repeated Property keys = 1;     // Property key-value pairs
+}
+
+message Property {
+    string key = 1;                 // Property key
+    uint32 type = 2;                // Property value type
+    
+    // Property value types
+    uint32 int_value = 3;
+    uint64 long_value = 4;
+    float float_value = 5;
+    double double_value = 6;
+    bool boolean_value = 7;
+    string string_value = 8;
+    PropertySet propertyset_value = 9;
+    PropertySetList propertysets_value = 10;
+}
+
+message PropertySetList {
+    repeated PropertySet propertyset = 1;
+}
+
+message DataSet {
+    uint64 num_of_columns = 1;      // Number of columns
+    repeated string columns = 2;    // Column names
+    repeated uint32 types = 3;      // Column data types
+    repeated Row rows = 4;          // Data rows
+}
+
+message Row {
+    repeated DataSetValue elements = 1;  // Row elements
+}
+
+message DataSetValue {
+    uint32 type = 1;                // Value type
+    
+    // Value types
+    uint32 int_value = 2;
+    uint64 long_value = 3;
+    float float_value = 4;
+    double double_value = 5;
+    bool boolean_value = 6;
+    string string_value = 7;
+}
+
+message Template {
+    string version = 1;             // Template version
+    repeated Metric metrics = 2;    // Template metrics
+    repeated Parameter parameters = 3; // Template parameters
+    string template_ref = 4;        // Template reference
+    bool is_definition = 5;         // Definition flag
+}
+
+message Parameter {
+    string name = 1;                // Parameter name
+    uint32 type = 2;                // Parameter type
+    
+    // Parameter value types
+    uint32 int_value = 3;
+    uint64 long_value = 4;
+    float float_value = 5;
+    double double_value = 6;
+    bool boolean_value = 7;
+    string string_value = 8;
+}
+
+// Data types enumeration
+enum DataType {
+    UNKNOWN = 0;
+    INT8 = 1;
+    INT16 = 2;
+    INT32 = 3;
+    INT64 = 4;
+    UINT8 = 5;
+    UINT16 = 6;
+    UINT32 = 7;
+    UINT64 = 8;
+    FLOAT = 9;
+    DOUBLE = 10;
+    BOOLEAN = 11;
+    STRING = 12;
+    DATETIME = 13;
+    TEXT = 14;
+    UUID_TYPE = 15;
+    DATASET_TYPE = 16;
+    BYTES = 17;
+    FILE = 18;
+    TEMPLATE_TYPE = 19;
+    PROPERTYSET_TYPE = 20;
+    PROPERTYSETLIST_TYPE = 21;
+}

@@ -97,26 +97,66 @@ def process_smart_breaker_message(data, device_id):
         elif event_type == 'telemetry':
             smart_breaker_data['stats']['telemetry_count'] += 1
             
-            # Update measurement ranges
+            # Update measurement ranges - handle nested structure
             if 'voltage' in measurements:
-                voltage = float(measurements['voltage'])
-                smart_breaker_data['stats']['voltage_range']['min'] = min(smart_breaker_data['stats']['voltage_range']['min'], voltage)
-                smart_breaker_data['stats']['voltage_range']['max'] = max(smart_breaker_data['stats']['voltage_range']['max'], voltage)
+                voltage_data = measurements['voltage']
+                if isinstance(voltage_data, dict):
+                    # Extract numeric values from nested structure
+                    for phase, value in voltage_data.items():
+                        if isinstance(value, (int, float)) and phase != 'unit':
+                            voltage = float(value)
+                            smart_breaker_data['stats']['voltage_range']['min'] = min(smart_breaker_data['stats']['voltage_range']['min'], voltage)
+                            smart_breaker_data['stats']['voltage_range']['max'] = max(smart_breaker_data['stats']['voltage_range']['max'], voltage)
+                elif isinstance(voltage_data, (int, float)):
+                    # Handle simple numeric value
+                    voltage = float(voltage_data)
+                    smart_breaker_data['stats']['voltage_range']['min'] = min(smart_breaker_data['stats']['voltage_range']['min'], voltage)
+                    smart_breaker_data['stats']['voltage_range']['max'] = max(smart_breaker_data['stats']['voltage_range']['max'], voltage)
                 
             if 'current' in measurements:
-                current = float(measurements['current'])
-                smart_breaker_data['stats']['current_range']['min'] = min(smart_breaker_data['stats']['current_range']['min'], current)
-                smart_breaker_data['stats']['current_range']['max'] = max(smart_breaker_data['stats']['current_range']['max'], current)
+                current_data = measurements['current']
+                if isinstance(current_data, dict):
+                    # Extract numeric values from nested structure
+                    for phase, value in current_data.items():
+                        if isinstance(value, (int, float)) and phase != 'unit':
+                            current = float(value)
+                            smart_breaker_data['stats']['current_range']['min'] = min(smart_breaker_data['stats']['current_range']['min'], current)
+                            smart_breaker_data['stats']['current_range']['max'] = max(smart_breaker_data['stats']['current_range']['max'], current)
+                elif isinstance(current_data, (int, float)):
+                    # Handle simple numeric value
+                    current = float(current_data)
+                    smart_breaker_data['stats']['current_range']['min'] = min(smart_breaker_data['stats']['current_range']['min'], current)
+                    smart_breaker_data['stats']['current_range']['max'] = max(smart_breaker_data['stats']['current_range']['max'], current)
                 
             if 'power' in measurements:
-                power = float(measurements['power'])
-                smart_breaker_data['stats']['power_range']['min'] = min(smart_breaker_data['stats']['power_range']['min'], power)
-                smart_breaker_data['stats']['power_range']['max'] = max(smart_breaker_data['stats']['power_range']['max'], power)
+                power_data = measurements['power']
+                if isinstance(power_data, dict):
+                    # Extract numeric values from nested structure
+                    for field, value in power_data.items():
+                        if isinstance(value, (int, float)) and field != 'unit':
+                            power = float(value)
+                            smart_breaker_data['stats']['power_range']['min'] = min(smart_breaker_data['stats']['power_range']['min'], power)
+                            smart_breaker_data['stats']['power_range']['max'] = max(smart_breaker_data['stats']['power_range']['max'], power)
+                elif isinstance(power_data, (int, float)):
+                    # Handle simple numeric value
+                    power = float(power_data)
+                    smart_breaker_data['stats']['power_range']['min'] = min(smart_breaker_data['stats']['power_range']['min'], power)
+                    smart_breaker_data['stats']['power_range']['max'] = max(smart_breaker_data['stats']['power_range']['max'], power)
                 
             if 'temperature' in measurements:
-                temp = float(measurements['temperature'])
-                smart_breaker_data['stats']['temperature_range']['min'] = min(smart_breaker_data['stats']['temperature_range']['min'], temp)
-                smart_breaker_data['stats']['temperature_range']['max'] = max(smart_breaker_data['stats']['temperature_range']['max'], temp)
+                temp_data = measurements['temperature']
+                if isinstance(temp_data, dict):
+                    # Extract numeric value from nested structure
+                    temp_value = temp_data.get('value')
+                    if isinstance(temp_value, (int, float)):
+                        temp = float(temp_value)
+                        smart_breaker_data['stats']['temperature_range']['min'] = min(smart_breaker_data['stats']['temperature_range']['min'], temp)
+                        smart_breaker_data['stats']['temperature_range']['max'] = max(smart_breaker_data['stats']['temperature_range']['max'], temp)
+                elif isinstance(temp_data, (int, float)):
+                    # Handle simple numeric value
+                    temp = float(temp_data)
+                    smart_breaker_data['stats']['temperature_range']['min'] = min(smart_breaker_data['stats']['temperature_range']['min'], temp)
+                    smart_breaker_data['stats']['temperature_range']['max'] = max(smart_breaker_data['stats']['temperature_range']['max'], temp)
         
         # Add message to recent list (keep last 50)
         message_info = {

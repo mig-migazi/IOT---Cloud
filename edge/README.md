@@ -1,26 +1,88 @@
 # Edge GRM Service
 
-A Gateway Resource Manager (GRM) service for edge devices that registers with IzumaNetworks and manages IoT resources.
+A Gateway Resource Manager (GRM) service for edge devices that communicates with Edge Core via WebSocket and manages IoT resources.
 
 ## Overview
 
 This service provides:
-- Automatic GRM registration with IzumaNetworks
+- Automatic GRM registration with Edge Core
 - Resource synchronization based on local configuration
 - Health monitoring and status reporting
 - Error recovery and retry mechanisms
-- Containerized deployment
+- Containerized deployment with socat TCP forwarding
 
 ## Features
 
-- **GRM Registration**: Automatically registers as a Gateway Resource Manager
+- **GRM Registration**: Automatically registers as a Gateway Resource Manager with Edge Core
 - **Resource Management**: Loads and syncs resources from `resources.json`
 - **Health Monitoring**: Continuous health checks and status reporting
 - **Error Recovery**: Automatic retry mechanisms for failed operations
 - **Configuration Management**: Environment-based configuration
 - **Comprehensive Logging**: Detailed logging for debugging and monitoring
+- **WebSocket Communication**: Real-time communication with Edge Core via WebSocket
+- **Periodic Updates**: Simulated sensor data updates with configurable intervals
 
 ## Architecture
+
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Edge Device / Container Host                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
+│  │   GRM Service   │    │   socat Proxy   │    │   Network   │ │
+│  │   Container     │◄──►│   (TCP Forward) │◄──►│  Interface  │ │
+│  │                 │    │                 │    │             │ │
+│  │ • main_async.py │    │ • Local:8081    │    │ • Internet  │ │
+│  │ • edge_core_    │    │ • Remote:8081   │    │ • VPN       │ │
+│  │   client.py     │    │ • WebSocket     │    │ • LAN       │ │
+│  │ • resource_     │    │   forwarding    │    │             │ │
+│  │   manager.py    │    │                 │    │             │ │
+│  └─────────────────┘    └─────────────────┘    └─────────────┘ │
+│           │                       │                    │       │
+│           │ WebSocket             │ TCP                │       │
+│           │ ws://localhost:8081   │ Forwarding         │       │
+│           │                       │                    │       │
+└───────────┼───────────────────────┼────────────────────┼───────┘
+            │                       │                    │
+            │                       │                    │
+            ▼                       ▼                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Remote Edge Core Host                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                    Edge Core Service                        │ │
+│  │                                                             │ │
+│  │ • WebSocket Server                                         │ │
+│  │ • JSON-RPC 2.0 Protocol                                    │ │
+│  │ • GRM Registration Endpoint (/1/grm)                       │ │
+│  │ • Resource Management APIs                                  │ │
+│  │ • Device Registration                                       │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Communication Flow
+
+1. **Container Startup**: GRM Service starts in Docker container
+2. **WebSocket Connection**: Service connects to `ws://localhost:8081`
+3. **TCP Forwarding**: socat forwards local:8081 → remote:8081
+4. **Edge Core Communication**: JSON-RPC calls over WebSocket
+5. **Resource Management**: Register GRM, add resources, update values
+6. **Periodic Updates**: Simulated sensor data sent every 30-60 seconds
+
+### Deployment Components
+
+- **GRM Service Container**: Python async service with WebSocket client
+- **socat Proxy**: TCP forwarding from local to remote Edge Core
+- **Edge Core Service**: Remote WebSocket server with JSON-RPC API
+- **Network**: Internet/VPN/LAN connection between hosts
+
+### File Structure
 
 ```
 edge/
@@ -39,6 +101,7 @@ edge/
 ├── resources.json        # Resource definitions
 ├── requirements.txt      # Python dependencies
 ├── Dockerfile           # Container configuration
+├── test.env             # Environment variables for testing
 ├── env.example          # Environment variables example
 └── README.md           # This file
 ```
@@ -48,8 +111,9 @@ edge/
 ### 1. Prerequisites
 
 - Python 3.9+
-- Docker (optional)
-- IzumaNetworks API credentials
+- Docker (for containerized deployment)
+- socat (for TCP forwarding to Edge Core)
+- Network access to Edge Core service (192.168.1.198:8081)
 
 ### 2. Configuration
 
@@ -59,10 +123,10 @@ Copy the example environment file and configure your settings:
 cp env.example .env
 ```
 
-Edit `.env` with your IzumaNetworks credentials:
+Edit `.env` with your Edge Core settings:
 
 ```bash
-IZUMA_API_KEY=your_actual_api_key
+IZUMA_API_BASE_URL=ws://localhost:8081
 IZUMA_DEVICE_ID=your_device_id
 ```
 
@@ -84,8 +148,29 @@ python3 -m grm_service.main_async
 # Build the container
 docker build -t edge-grm-service .
 
+# Setup socat forwarding (on container host)
+socat TCP-LISTEN:8081,fork TCP:192.168.1.198:8081 &
+
 # Run the container
-docker run --env-file .env edge-grm-service
+docker run -it --rm --name edge-grm-service \
+  --env-file test.env \
+  edge-grm-service
+```
+
+### Socat Setup
+
+The GRM service container connects to `ws://localhost:8081`, which is forwarded to the remote Edge Core service using socat:
+
+```bash
+# Install socat (if not already installed)
+sudo apt-get install socat  # Ubuntu/Debian
+brew install socat          # macOS
+
+# Start TCP forwarding
+socat TCP-LISTEN:8081,fork TCP:192.168.1.198:8081 &
+
+# Verify forwarding is working
+netstat -tlnp | grep 8081
 ```
 
 ## Configuration
@@ -147,43 +232,48 @@ Resources are defined in `resources.json` with the following format:
 
 ## API Reference
 
-### IzumaNetworks Client
+### Edge Core Client
 
-The `IzumaClient` class provides methods for interacting with IzumaNetworks:
+The `EdgeCoreClient` class provides methods for interacting with Edge Core via WebSocket:
 
-- `register_grm(service_info)`: Register as a GRM
-- `unregister_grm()`: Unregister GRM
-- `register_resource(resource)`: Register a resource
-- `update_resource(resource_id, resource)`: Update a resource
-- `delete_resource(resource_id)`: Delete a resource
-- `get_resources()`: Get all registered resources
-- `health_check()`: Perform health check
+- `connect()`: Connect to Edge Core WebSocket server
+- `disconnect()`: Disconnect from Edge Core
+- `register_grm()`: Register as a GRM with Edge Core
+- `add_resource(resource)`: Add a resource to Edge Core
+- `update_resource_value(resource)`: Update a resource value
+- `delete_resource(resource)`: Delete a resource from Edge Core
+- `device_register(device_id)`: Register a device
+- `write(device_id, value)`: Write a value to a device
 
-### Resource Manager
+### Async Resource Manager
 
-The `ResourceManager` class handles resource operations:
+The `AsyncResourceManager` class handles resource operations:
 
 - `load_local_resources(file_path)`: Load resources from file
 - `validate_local_resources()`: Validate all local resources
-- `sync_resources()`: Synchronize with IzumaNetworks
+- `sync_resources()`: Synchronize with Edge Core
 - `register_single_resource(resource)`: Register a single resource
 - `update_single_resource(resource)`: Update a single resource
-- `delete_single_resource(object_id, object_instance_id, resource_id)`: Delete a resource
+- `delete_single_resource(resource)`: Delete a resource
+- `generate_simulated_values()`: Generate simulated sensor data
+- `update_all_resources()`: Update all resources with simulated values
 
 ## Service Lifecycle
 
 ### Startup Sequence
 
 1. **Initialization**: Validate configuration and initialize components
-2. **GRM Registration**: Register as a Gateway Resource Manager
-3. **Resource Sync**: Load and synchronize local resources
-4. **Health Monitoring**: Start health check thread
+2. **Edge Core Connection**: Connect to Edge Core WebSocket server
+3. **GRM Registration**: Register as a Gateway Resource Manager
+4. **Resource Sync**: Load and synchronize local resources
+5. **Health Monitoring**: Start health check and resource update tasks
 
 ### Shutdown Sequence
 
-1. **Stop Health Monitoring**: Stop health check thread
-2. **GRM Unregistration**: Unregister from IzumaNetworks
-3. **Cleanup**: Clean up resources and connections
+1. **Stop Tasks**: Stop health check and resource update tasks
+2. **GRM Unregistration**: Unregister from Edge Core
+3. **Disconnect**: Disconnect from Edge Core WebSocket
+4. **Cleanup**: Clean up resources and connections
 
 ## Logging
 
@@ -256,10 +346,11 @@ flake8 grm_service/
 
 ### Common Issues
 
-1. **Authentication Failed**: Check `IZUMA_API_KEY` configuration
+1. **WebSocket Connection Failed**: Check Edge Core service is running and accessible
 2. **Device ID Not Found**: Verify `IZUMA_DEVICE_ID` is correct
 3. **Resource Sync Failed**: Check `resources.json` format and network connectivity
-4. **Health Check Failed**: Verify IzumaNetworks API availability
+4. **socat Forwarding Failed**: Verify TCP forwarding is working correctly
+5. **GRM Registration Failed**: Check if GRM name is already registered
 
 ### Debug Mode
 
@@ -274,16 +365,25 @@ LOG_LEVEL=DEBUG
 Test individual components:
 
 ```python
+import asyncio
 from grm_service.edge_core_client import EdgeCoreClient
 from grm_service.resource_manager_async import AsyncResourceManager
 
-# Test Edge Core connection
-client = EdgeCoreClient()
-await client.connect()
+async def test_components():
+    # Test Edge Core connection
+    client = EdgeCoreClient()
+    await client.connect()
+    
+    # Test resource loading
+    manager = AsyncResourceManager(client)
+    manager.load_local_resources("resources.json")
+    
+    # Test simulated data generation
+    values = manager.generate_simulated_values()
+    print(f"Generated {len(values)} simulated values")
 
-# Test resource loading
-manager = AsyncResourceManager(client)
-manager.load_local_resources("resources.json")
+# Run the test
+asyncio.run(test_components())
 ```
 
 ## Contributing

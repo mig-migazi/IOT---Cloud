@@ -53,6 +53,152 @@ Smart Breaker Simulator → MQTT Broker → MQTT-Kafka Bridge → RedPanda → E
    - **App Registry Service**: http://localhost:5002
    - **TimescaleDB**: localhost:5432 (PostgreSQL)
 
+## 🎛️ Advanced Dashboard Guide
+
+The FDI Dashboard provides a comprehensive interface for managing your IoT platform. Access it at **http://localhost:5004** to monitor devices, manage FDI packages, analyze data, and track system performance.
+
+### 🚀 **Tab 1: FDI Management**
+
+The main tab for managing Field Device Integration packages and monitoring device status.
+
+#### **Server Status Section**
+- **Server Status**: Shows if the FDI server is running or stopped
+- **Devices Count**: Number of currently discovered IoT devices
+- **Packages Count**: Total FDI packages stored in the system
+- **OPC UA Port**: Port for OPC UA server communication (4840)
+- **Controls**: Start/Stop server, refresh status
+
+#### **FDI Packages Section**
+- **Create Smart Breaker Package**: Generates a sample FDI package for smart breakers
+- **Package List**: Displays all stored FDI packages with metadata
+- **Package Details**: View package contents, device parameters, and commands
+- **Package Management**: Store, retrieve, and manage device definitions
+
+#### **Devices Section**
+- **Device Discovery**: Shows all discovered IoT devices in real-time
+- **Device Status**: Current operational status and last communication time
+- **Device Details**: Click "View" to see live measurements and FDI mapping
+- **Parameter Control**: Simulate device parameter changes for testing
+
+#### **Device Commands Section**
+- **Device Selection**: Choose target device from dropdown
+- **Command Types**: Trip breaker, reset breaker, set thresholds, get diagnostics
+- **Parameter Input**: Set specific values for commands
+- **Command Execution**: Send commands to devices via MQTT
+
+### 📊 **Tab 2: Data Analytics & Monitoring**
+
+Comprehensive monitoring and analytics for your IoT data pipeline.
+
+#### **System Overview Section**
+- **System Status**: Overall platform health indicator
+- **Active Devices**: Real-time count of connected devices
+- **Data Throughput**: Messages per minute flowing through the system
+- **Last Update**: Timestamp of most recent data activity
+- **Controls**: Refresh all stats, system health check
+
+#### **📡 Live Data Stream Section**
+- **Live Indicator**: Blinking green dot showing real-time activity
+- **Message Counter**: Total messages processed in current session
+- **Real-time Feed**: Live stream of incoming messages and system events
+- **Message Types**: Device telemetry, pipeline status, system notifications
+- **Controls**: Clear stream, export data to file
+
+#### **🚀 Kafka/RedPanda Pipeline Section**
+- **MQTT Input**: Status of MQTT broker and device connections
+- **RedPanda Topics**: Health of Kafka topics and message flow
+- **TimescaleDB**: Database status and storage performance
+- **Pipeline Flow**: Visual representation of data movement through the system
+
+#### **📋 Topic Details Section**
+- **iot.raw**: Raw IoT device messages from MQTT
+- **iot.enriched**: General enriched messages with metadata
+- **iot.smart_breaker.enriched**: Smart breaker specific data
+- **Performance Metrics**: Messages per second, total messages, lag
+
+#### **📊 TimescaleDB Analytics Section**
+- **Data Points**: Total records stored in time-series database
+- **Devices Stored**: Number of devices with historical data
+- **Compression Ratio**: Data compression efficiency
+- **Query Performance**: Database query response times
+
+#### **📈 Data Analytics Section**
+- **Device Selection**: Choose specific device for analysis
+- **Metric Selection**: Select measurement type (voltage, current, temperature, etc.)
+- **Timeframe Selection**: Choose analysis period (1h, 6h, 24h, 7d, 30d)
+- **Data Loading**: Load and display historical data from TimescaleDB
+
+### 🔄 **Tab 3: RedPanda/Kafka Metrics**
+
+Dedicated monitoring for your event streaming infrastructure.
+
+#### **🔄 RedPanda/Kafka Overview**
+- **Broker Status**: Health of RedPanda broker
+- **Active Topics**: Number of active Kafka topics
+- **Active Consumers**: Number of consumer applications
+- **Message Throughput**: Messages per second flowing through the system
+
+#### **📊 Topic Performance**
+- **Topic Details**: Individual topic performance metrics
+- **Partitions**: Number of topic partitions
+- **Replication**: Replication factor for fault tolerance
+- **Messages/sec**: Real-time message throughput per topic
+- **Total Messages**: Cumulative message count
+- **Lag**: Consumer lag for each topic
+
+#### **👥 Consumer Groups**
+- **redpanda-connector**: Service consuming messages for TimescaleDB storage
+- **enrichment-service**: Service processing and enriching messages
+- **Group Status**: Active/Inactive status of consumer groups
+- **Topics**: Topics consumed by each group
+- **Members**: Number of consumer instances
+- **Last Commit**: Timestamp of last offset commit
+
+#### **📈 Message Flow Analytics**
+- **Pipeline Visualization**: MQTT → RedPanda → TimescaleDB flow diagram
+- **Flow Metrics**: Real-time data movement statistics
+- **System Health**: Overall pipeline health indicators
+- **Export Report**: Generate comprehensive flow analysis report
+
+### 🎯 **Real-Time Features**
+
+#### **Live Data Updates**
+- **Auto-refresh**: Dashboard updates every 10-30 seconds
+- **Real-time Counters**: Message counts and device numbers update live
+- **Live Stream**: Continuous feed of system activity
+- **Visual Indicators**: Pulsing, blinking, and animated elements
+
+#### **Interactive Controls**
+- **Device Management**: Add, remove, and configure devices
+- **Parameter Control**: Simulate device parameter changes
+- **Command Execution**: Send commands to devices in real-time
+- **Data Export**: Download data streams and analytics
+
+#### **System Monitoring**
+- **Health Checks**: Continuous monitoring of all services
+- **Performance Metrics**: Real-time performance indicators
+- **Error Tracking**: Monitor and alert on system issues
+- **Resource Usage**: Track system resource consumption
+
+### 🔧 **Dashboard Configuration**
+
+#### **Access Control**
+- **Port Configuration**: Default port 5004 (configurable)
+- **Network Access**: Accessible from any network interface
+- **Security**: Basic authentication and access controls
+
+#### **Customization**
+- **Theme**: Modern, responsive design
+- **Layout**: Configurable dashboard layout
+- **Widgets**: Customizable monitoring widgets
+- **Alerts**: Configurable alerting and notifications
+
+#### **Integration**
+- **API Endpoints**: RESTful API for external integrations
+- **WebSocket**: Real-time updates for external applications
+- **Export Formats**: JSON, CSV, and text export options
+- **Third-party Tools**: Integration with monitoring and alerting systems
+
 ## 📊 Data Flow
 
 ### Message Routing & Topics

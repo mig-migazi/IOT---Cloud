@@ -221,12 +221,62 @@ services:
     networks:
       - iot-cloud-network
 
+  # TimescaleDB - Time-series database for IoT data storage and aggregation
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: iot-cloud-timescaledb
+    restart: unless-stopped
+    ports:
+      - "5432:5432"     # PostgreSQL port
+    environment:
+      - POSTGRES_DB=iot_cloud
+      - POSTGRES_USER=iot_user
+      - POSTGRES_PASSWORD=iot_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./config/timescaledb_init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - iot-cloud-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iot_user -d iot_cloud"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # RedPanda Connector - Connects RedPanda to TimescaleDB for time-series storage
+  redpanda-connector:
+    build:
+      context: ./services/redpanda-connector
+      no_cache: true
+    container_name: iot-cloud-redpanda-connector
+    restart: unless-stopped
+    environment:
+      - REDPANDA_BROKERS=redpanda:29092
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_DB=iot_cloud
+      - TIMESCALEDB_USER=iot_user
+      - TIMESCALEDB_PASSWORD=iot_password
+      - RAW_TOPIC=iot.raw
+      - ENRICHED_TOPIC=iot.enriched
+      - SMART_BREAKER_TOPIC=iot.smart_breaker.enriched
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
 volumes:
   redpanda_data:
   appregistry_data:
   mqtt_data:
   mqtt_logs:
   fdi_packages:
+  timescaledb_data:
 
 networks:
   iot-cloud-network:

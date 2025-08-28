@@ -1,17 +1,20 @@
-# ⚡ IoT Cloud Platform
+# ⚡ IoT Cloud Platform with FDI Integration & TimescaleDB
 
-A lightweight, cloud-ready IoT data pipeline with **MQTT-based device communication**, real-time message enrichment, application registry, and **tabbed visualization dashboard** featuring **device-type specific topics** for application data isolation.
+A comprehensive, cloud-ready IoT data pipeline featuring **FDI (Field Device Integration) package management**, **MQTT-based device communication**, real-time message enrichment, **TimescaleDB time-series storage**, and an **advanced dashboard** with device management, analytics, and monitoring capabilities.
 
 ## 🏗️ Architecture
 
 ```
-Smart Breaker Simulator → MQTT Broker → MQTT-Kafka Bridge → RedPanda (iot.raw) → Enrichment Service → RedPanda (iot.enriched) → Web Dashboard
-                                    ↓                                    ↓
-                            App Registry Service                    Device-Type Topics
-                                    ↓                                    ↓
-                            Application Registrations         iot.smart_breaker.enriched
-                                                                    ↓
-                                                            Smart Grid Monitor Tab
+Smart Breaker Simulator → MQTT Broker → MQTT-Kafka Bridge → RedPanda → Enrichment Service → RedPanda → RedPanda Connector → TimescaleDB
+                                    ↓                                    ↓                    ↓
+                            App Registry Service                    Device-Type Topics    Time-Series Storage
+                                    ↓                                    ↓                    ↓
+                            Application Registrations         iot.smart_breaker.enriched  Continuous Aggregates
+                                    ↓                                    ↓                    ↓
+                            FDI Package Manager              Smart Grid Monitor Tab    Analytics Dashboard
+                                    ↓                                    ↓                    ↓
+                            Device Definitions &            Real-time Monitoring      Historical Data Analysis
+                            Configuration Management
 ```
 
 ### Core Services
@@ -22,7 +25,10 @@ Smart Breaker Simulator → MQTT Broker → MQTT-Kafka Bridge → RedPanda (iot.
 - **RedPanda**: Event streaming platform (Kafka-compatible) for message brokering
 - **Enrichment Service**: Adds device metadata, context, and routes data to **both general AND device-type specific topics**
 - **App Registry Service**: Manages applications that register interest in specific device types
-- **Web Dashboard**: **Tabbed interface** with IoT Overview + Smart Grid Monitor for application-specific data isolation
+- **FDI Package Manager**: **NEW** - Manages Field Device Integration packages, provides OPC UA interface, and web UI for device management
+- **RedPanda Connector**: **NEW** - Consumes messages from RedPanda and stores them in TimescaleDB for time-series analysis
+- **TimescaleDB**: **NEW** - PostgreSQL extension for time-series data with continuous aggregates and compression
+- **Advanced Dashboard**: **NEW** - Comprehensive interface with FDI Management, Data Analytics, and RedPanda/Kafka Metrics tabs
 
 ## 🚀 Quick Start
 
@@ -40,16 +46,17 @@ Smart Breaker Simulator → MQTT Broker → MQTT-Kafka Bridge → RedPanda (iot.
    ```
 
 3. **Access services**:
-   - **Web Dashboard**: http://localhost:5001 (with IoT Overview + Smart Grid Monitor tabs)
+   - **FDI Dashboard**: http://localhost:5004 (Main interface with all features)
    - **RedPanda Console**: http://localhost:8086
    - **RedPanda API**: localhost:9092 (external), localhost:29092 (internal)
    - **MQTT Broker**: localhost:1883 (MQTT), localhost:9001 (WebSocket)
    - **App Registry Service**: http://localhost:5002
+   - **TimescaleDB**: localhost:5432 (PostgreSQL)
 
 ## 📊 Data Flow
 
 ### Message Routing & Topics
-The system now supports **MQTT-based IoT communication** with seamless Kafka integration:
+The system supports **MQTT-based IoT communication** with seamless Kafka integration and time-series storage:
 
 **MQTT Topics (Device → MQTT Broker):**
 - **`iot/{device_id}/raw`** → Raw telemetry data
@@ -60,7 +67,12 @@ The system now supports **MQTT-based IoT communication** with seamless Kafka int
 - **`iot.raw`** → Raw device messages (from MQTT)
 - **`iot.enriched`** → General enriched messages (all device types)
 - **`iot.smart_breaker.enriched`** → Smart breaker data only (for Smart Grid Monitor app)
-- **Future topics**: `iot.smart_meter.enriched`, `iot.environmental_sensor.enriched`
+
+**TimescaleDB Tables:**
+- **`iot_raw_data`** → Raw messages with time-series optimization
+- **`iot_enriched_data`** → Enriched messages with device metadata
+- **`smart_breaker_data`** → Smart breaker specific data
+- **`device_metadata`** → Device configuration and capabilities
 
 ### Raw Message (from simulator)
 ```json
@@ -122,30 +134,18 @@ The system now supports **MQTT-based IoT communication** with seamless Kafka int
 }
 ```
 
-### Trends Data (aggregated metrics)
-```json
-{
-  "device_id": "breaker-001",
-  "device_type": "smart_breaker",
-  "timestamp": "2025-08-20T18:00:54.117782Z",
-  "event_type": "trends",
-  "trends": [
-    {
-      "c": "voltage_phase_a",
-      "t": 1755625237,
-      "v": "117.27",
-      "avg": "118.5",
-      "min": "115.2",
-      "max": "122.1"
-    }
-  ]
-}
-```
-
 ## 🔧 Configuration
 
+### FDI Package Management
+The system now uses **FDI (Field Device Integration) packages** as the single source of truth for device definitions:
+
+- **FDI Packages**: Stored in blob storage with device parameters, commands, and metadata
+- **Device Registry**: Automatically populated from FDI packages
+- **OPC UA Interface**: Optional OPC UA server for industrial integration
+- **Web UI**: Comprehensive dashboard for managing FDI packages and devices
+
 ### Device Registry
-Edit `config/device-registry.json` to define device types and their capabilities.
+Edit `config/device-registry.json` for legacy device types, or use the FDI Package Manager for new devices.
 
 ### App Registry
 Applications can register for specific device types via the App Registry Service API:
@@ -174,8 +174,9 @@ curl http://localhost:5002/api/applications/by-device-type/smart_breaker
 ```
 IOT-Cloud/
 ├── config/                     # Configuration files
-│   ├── device-registry.json   # Device type definitions
-│   └── mosquitto.conf         # MQTT broker configuration
+│   ├── device-registry.json   # Legacy device type definitions
+│   ├── mosquitto.conf         # MQTT broker configuration
+│   └── timescaledb_init.sql   # TimescaleDB schema and policies
 ├── services/                   # Microservices
 │   ├── enrichment/            # Message enrichment service
 │   │   ├── enrichment_service.py
@@ -188,7 +189,19 @@ IOT-Cloud/
 │   │   ├── app.py
 │   │   ├── requirements.txt
 │   │   └── Dockerfile
-│   ├── web-app/               # Tabbed web dashboard
+│   ├── fdi-package-manager/   # NEW: FDI package management service
+│   │   ├── fdi_package.py     # FDI package data structures
+│   │   ├── fdi_blob_storage.py # Package storage and manifest
+│   │   ├── fdi_server.py      # FDI communication server
+│   │   ├── web_ui.py          # Web dashboard and API
+│   │   ├── main.py            # Service entry point
+│   │   ├── templates/         # Dashboard HTML templates
+│   │   └── requirements.txt
+│   ├── redpanda-connector/    # NEW: RedPanda to TimescaleDB connector
+│   │   ├── connector.py       # Main connector application
+│   │   ├── requirements.txt
+│   │   └── Dockerfile
+│   ├── web-app/               # Legacy web dashboard
 │   │   ├── app.py
 │   │   ├── templates/
 │   │   └── requirements.txt
@@ -209,60 +222,91 @@ IOT-Cloud/
 
 ## 🚀 Features
 
+### **Core IoT Capabilities**
 - **Real-time Telemetry**: Smart breaker simulator generates realistic electrical measurements with **dynamic burst logic**
 - **Trends Aggregation**: Collects and aggregates historical data during message bursts
-- **Intelligent Enrichment**: Automatically detects device types and adds metadata
+- **Intelligent Enrichment**: Automatically detects device types and adds metadata from FDI packages
 - **Application Registry**: Centralized service for managing application registrations
 - **Device Type Mapping**: Dynamic device type detection and metadata enrichment
-- **Tabbed Dashboard**: **IoT Overview** (system-wide) + **Smart Grid Monitor** (smart breaker only)
-- **Data Isolation**: Each application sees only its relevant device type data
+
+### **NEW: FDI Package Management**
+- **FDI Packages**: Standard Field Device Integration packages for device definitions
+- **Blob Storage**: File-based storage for FDI packages with manifest management
+- **OPC UA Interface**: Optional OPC UA server for industrial protocol integration
+- **Device Discovery**: Automatic device discovery and status monitoring
+- **Parameter Control**: Real-time device parameter setting and monitoring
+
+### **NEW: TimescaleDB Integration**
+- **Time-Series Storage**: Optimized storage for IoT time-series data
+- **Continuous Aggregates**: Automatic hourly and daily aggregations
+- **Compression Policies**: Automatic data compression for historical data
+- **Retention Policies**: Configurable data retention and cleanup
+- **Hypertables**: Automatic time-based partitioning for performance
+
+### **NEW: Advanced Dashboard**
+- **FDI Management Tab**: Manage FDI packages, view devices, and control parameters
+- **Data Analytics Tab**: Query TimescaleDB data with device and metric selection
+- **RedPanda/Kafka Metrics Tab**: Monitor message flow, topics, and consumer groups
+- **Real-time Updates**: Live data refresh and device status monitoring
+- **Timezone Support**: Proper timezone conversion for data display
+
+### **Data Pipeline Features**
 - **Multi-Topic Architecture**: Route data to general and device-specific topics
 - **Kafka Integration**: Full RedPanda/Kafka compatibility for event streaming
 - **MQTT Protocol**: Industry-standard IoT messaging with QoS 1 and structured topics
+- **Data Persistence**: Long-term storage in TimescaleDB with aggregation
 
 ## 🔧 Development
 
-- **Tabbed Dashboard**: 
-  - **IoT Overview Tab**: System-wide message flow and status at http://localhost:5001
-  - **Smart Grid Monitor Tab**: Smart breaker data only (application isolation)
+### **Dashboard Access**
+- **Main Dashboard**: http://localhost:5004 (FDI Package Manager with all features)
+- **Legacy Dashboard**: http://localhost:5001 (Basic IoT overview)
+
+### **Service Monitoring**
 - **RedPanda Console**: Monitor topics and consumers at http://localhost:8086
 - **Service Logs**: `docker-compose logs -f [service-name]`
 - **Test App Registry**: http://localhost:5002/api/applications
-- **Topic Monitoring**: Check device-type specific topics in RedPanda Console
+- **TimescaleDB**: Connect with `psql -h localhost -U iot_user -d iot_cloud`
 
-### Testing the Pipeline
+### **Testing the Pipeline**
 
 1. **Start all services**: `docker-compose up -d`
 2. **Check simulator logs**: `docker-compose logs -f smart-breaker-simulator`
 3. **Monitor enrichment**: `docker-compose logs -f enrichment-service`
-4. **View dashboard**: Open http://localhost:5001
-5. **Test tabbed interface**: Switch between IoT Overview and Smart Grid Monitor tabs
-6. **Verify data isolation**: Smart Grid Monitor shows only smart breaker data
-7. **Check topics**: Verify `iot.smart_breaker.enriched` topic in RedPanda Console
-8. **Register test apps**: Use the curl commands above
+4. **View main dashboard**: Open http://localhost:5004
+5. **Test FDI features**: Create and manage FDI packages
+6. **Monitor data flow**: Check RedPanda/Kafka metrics tab
+7. **Query analytics**: Use the Data Analytics tab with TimescaleDB
+8. **Verify data storage**: Check TimescaleDB tables and continuous aggregates
 
 ## 🏗️ New Architecture Features
 
-### **MQTT Integration & IoT Standards**
-- **MQTT Protocol**: Industry-standard IoT messaging protocol (QoS 1, retain messages)
-- **Topic Hierarchy**: Structured topics like `iot/{device_id}/{data_type}` for easy routing
-- **Bridge Architecture**: Seamless MQTT → Kafka integration for hybrid IoT/streaming systems
-- **Device Status**: Real-time device online/offline status via MQTT status topics
+### **FDI Integration & Device Management**
+- **FDI Packages**: Standard Field Device Integration packages for device definitions
+- **Blob Storage**: File-based storage with manifest management
+- **OPC UA Server**: Optional industrial protocol integration
+- **Device Discovery**: Real-time device status monitoring
+- **Parameter Control**: Live device parameter setting
 
-### **Tabbed Dashboard Interface**
-- **IoT Overview Tab**: System-wide monitoring, all device types, general status
-- **Smart Grid Monitor Tab**: Application-specific view showing ONLY smart breaker data
-- **Data Isolation**: Each tab shows relevant data without cross-contamination
+### **TimescaleDB Time-Series Storage**
+- **Hypertables**: Automatic time-based partitioning
+- **Continuous Aggregates**: Pre-computed hourly and daily aggregations
+- **Compression**: Automatic data compression for historical data
+- **Retention**: Configurable data retention policies
+- **Performance**: Optimized for time-series queries
 
-### **Device-Type Specific Topics**
-- **Multi-Topic Routing**: Enrichment service publishes to both general and device-specific topics
-- **Application Isolation**: Each app subscribes to its relevant topic (e.g., `iot.smart_breaker.enriched`)
-- **Scalable Design**: Easy to add new device types and corresponding topics
+### **Advanced Dashboard Interface**
+- **FDI Management**: Package management, device monitoring, parameter control
+- **Data Analytics**: TimescaleDB querying with device and metric selection
+- **RedPanda Metrics**: Message flow monitoring, topic performance, consumer groups
+- **Real-time Updates**: Live data refresh and status monitoring
+- **Timezone Support**: Proper timezone conversion and display
 
-### **Burst Logic & Dynamic Messaging**
-- **Variable Intervals**: Simulator generates messages every 3-8 seconds (not fixed 5-second intervals)
-- **Burst Generation**: 25% chance of sending 3-6 messages in rapid succession
-- **Trends Integration**: Trends data sent after burst messages for better data analysis
+### **Enhanced Data Pipeline**
+- **RedPanda Connector**: Dedicated service for TimescaleDB integration
+- **Data Persistence**: Long-term storage with aggregation
+- **Performance Monitoring**: Comprehensive metrics and health checks
+- **Scalable Architecture**: Easy to add new device types and data sources
 
 ## 🚀 Deployment
 
@@ -276,10 +320,11 @@ The platform is containerized with Docker and ready for cloud deployment:
 
 ### Common Issues & Solutions
 
-1. **MQTT Bridge Asyncio Errors**: Fixed - replaced `asyncio.sleep()` with `time.sleep()`
-2. **Simulator Logging Issues**: Fixed - switched from `structlog` to standard `logging`
-3. **Docker Caching Issues**: Use `docker-compose down [service] && docker rmi -f [image]` to force rebuilds
-4. **Service Startup Order**: Services have proper health checks and dependencies
+1. **Docker Caching Issues**: Use `docker-compose down --volumes --rmi all` to force complete rebuilds
+2. **FDI Service Not Starting**: Check logs with `docker-compose logs fdi-package-manager`
+3. **TimescaleDB Connection**: Verify service is healthy with `docker-compose ps timescaledb`
+4. **RedPanda Connector**: Check for data type adaptation errors in logs
+5. **Dashboard Not Loading**: Ensure FDI service is running and accessible
 
 ### Service Status Check
 
@@ -291,12 +336,17 @@ docker-compose ps
 docker-compose logs -f smart-breaker-simulator
 docker-compose logs -f mqtt-kafka-bridge
 docker-compose logs -f enrichment-service
-docker-compose logs -f web-app
+docker-compose logs -f fdi-package-manager
+docker-compose logs -f redpanda-connector
+docker-compose logs -f timescaledb
 
-# Force rebuild a service
-docker-compose down [service-name]
-docker rmi -f iot-cloud-[service-name]:latest
-docker-compose up -d [service-name]
+# Force rebuild all services
+docker-compose down --volumes --rmi all
+docker-compose up --build -d
+
+# Check TimescaleDB
+docker exec -it iot-cloud-timescaledb psql -U iot_user -d iot_cloud -c "\dt"
+docker exec -it iot-cloud-timescaledb psql -U iot_user -d iot_cloud -c "\dc"
 ```
 
 ## 🤝 Contributing
@@ -310,11 +360,12 @@ docker-compose up -d [service-name]
 
 ### Development Guidelines
 
-- **Service Integration**: New services should integrate with the existing Kafka topics
-- **API Design**: Follow RESTful patterns established by the app registry service
+- **Service Integration**: New services should integrate with existing Kafka topics and TimescaleDB
+- **API Design**: Follow RESTful patterns established by the FDI Package Manager
 - **Configuration**: Use environment variables for service configuration
-- **Testing**: Test with the existing simulator and enrichment pipeline
+- **Testing**: Test with existing simulator and enrichment pipeline
 - **MQTT Standards**: Follow MQTT topic naming conventions: `iot/{device_id}/{data_type}`
+- **FDI Standards**: Follow Field Device Integration standards for device definitions
 
 ## 📄 License
 
@@ -322,16 +373,18 @@ MIT License - see LICENSE file for details.
 
 ## 🎯 Current Status
 
-**✅ FULLY OPERATIONAL** - All services running and communicating successfully:
+**✅ FULLY OPERATIONAL** - All services running with new FDI and TimescaleDB features:
 
 - **MQTT Simulator**: ✅ Sending data to MQTT topics with burst logic
 - **MQTT Broker**: ✅ Eclipse Mosquitto running and healthy
-- **MQTT Bridge**: ✅ Successfully forwarding MQTT → Kafka (15,950+ messages processed)
-- **Enrichment Service**: ✅ Processing and routing messages to device-specific topics
-- **Web Dashboard**: ✅ Accessible with tabbed interface
+- **MQTT Bridge**: ✅ Successfully forwarding MQTT → Kafka
+- **Enrichment Service**: ✅ Processing and routing messages with FDI integration
+- **FDI Package Manager**: ✅ Managing device definitions and providing web UI
+- **RedPanda Connector**: ✅ Storing data in TimescaleDB
+- **TimescaleDB**: ✅ Time-series storage with continuous aggregates
+- **Advanced Dashboard**: ✅ Comprehensive interface with all features
 - **App Registry**: ✅ Managing application registrations
-- **Data Flow**: ✅ Complete MQTT → Kafka → Enrichment → Dashboard pipeline working
+- **Data Flow**: ✅ Complete MQTT → Kafka → Enrichment → TimescaleDB pipeline working
 
-**Message Count**: 15,950+ and continuously increasing
-**Last Test**: 2025-08-20 18:01:17 UTC
-**Status**: All systems operational and processing real-time IoT data
+**New Features**: FDI Package Management, TimescaleDB Integration, Advanced Dashboard
+**Status**: All systems operational with enhanced capabilities

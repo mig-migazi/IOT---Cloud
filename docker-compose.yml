@@ -218,6 +218,12 @@ services:
         condition: service_healthy
       mqtt-broker:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - iot-cloud-network
 
@@ -245,28 +251,37 @@ services:
       retries: 5
       start_period: 30s
 
-  # RedPanda Connector - Connects RedPanda to TimescaleDB for time-series storage
-  redpanda-connector:
-    build:
-      context: ./services/redpanda-connector
-      no_cache: true
-    container_name: iot-cloud-redpanda-connector
+  # RedPanda Connect - Official connector for RedPanda to PostgreSQL/TimescaleDB
+  redpanda-connect:
+    image: redpandadata/connect:latest
+    container_name: iot-cloud-redpanda-connect
     restart: unless-stopped
-    environment:
-      - REDPANDA_BROKERS=redpanda:29092
-      - TIMESCALEDB_HOST=timescaledb
-      - TIMESCALEDB_PORT=5432
-      - TIMESCALEDB_DB=iot_cloud
-      - TIMESCALEDB_USER=iot_user
-      - TIMESCALEDB_PASSWORD=iot_password
-      - RAW_TOPIC=iot.raw
-      - ENRICHED_TOPIC=iot.enriched
-      - SMART_BREAKER_TOPIC=iot.smart_breaker.enriched
+    ports:
+      - "8080:8080"  # RedPanda Connect REST API
+    volumes:
+      - ./config/connect-configs/connect.yaml:/connect.yaml
     depends_on:
       redpanda:
         condition: service_healthy
-      timescaledb:
-        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
+
+
+  # Schema Registry - Manages JSON schemas generated from FDI packages
+  schema-registry:
+    build:
+      context: ./services/schema-registry
+      no_cache: true
+    container_name: iot-cloud-schema-registry
+    restart: unless-stopped
+    ports:
+      - "5005:5000"
+    environment:
+      - SCHEMA_REGISTRY_PORT=5000
+    depends_on:
+      fdi-package-manager:
+        condition: service_started
     networks:
       - iot-cloud-network
 

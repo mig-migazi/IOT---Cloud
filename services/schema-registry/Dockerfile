@@ -20,6 +20,10 @@ USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import psycopg2; print('Healthy')" || exit 1
+    CMD curl -f http://localhost:5000/health || exit 1
 
-CMD ["python", "connector.py"]
+# Expose port
+EXPOSE 5000
+
+# Run the application
+CMD ["python", "main.py"]

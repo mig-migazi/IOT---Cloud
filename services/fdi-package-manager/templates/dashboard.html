@@ -679,6 +679,101 @@
             from { transform: translateX(-20px); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
+        
+        /* Schema Registry Styles */
+        .schema-overview {
+            margin-bottom: 20px;
+        }
+        
+        .schema-browser, .schema-comparison, .validation-results {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .schema-controls, .comparison-controls {
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .schema-viewer, .comparison-result, .validation-history {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .schema-viewer pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .validation-stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .validation-metrics {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .metric-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .comparison-diff {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .diff-added {
+            background: #d4edda;
+            color: #155724;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 2px 0;
+        }
+        
+        .diff-removed {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 2px 0;
+        }
+        
+        .diff-changed {
+            background: #fff3cd;
+            color: #856404;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 2px 0;
+        }
     </style>
 </head>
 <body>
@@ -763,6 +858,87 @@
                 </select>
                 <input type="text" id="command-param" placeholder="Parameter value" style="padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #e2e8f0;">
                 <button class="btn" onclick="sendCommand()">Send Command</button>
+            </div>
+        </div>
+        
+        <!-- Schema Registry -->
+        <div class="card">
+            <h2>📋 Schema Registry</h2>
+            <div class="schema-overview">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number" id="total-schemas">-</div>
+                        <div class="stat-label">Total Schemas</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="device-types">-</div>
+                        <div class="stat-label">Device Types</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="validation-success">-</div>
+                        <div class="stat-label">Validation Success</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="schema-health">-</div>
+                        <div class="stat-label">Schema Health</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="schema-browser">
+                <h3>🔍 Schema Browser</h3>
+                <div class="schema-controls">
+                    <select id="schema-device-type" style="padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #e2e8f0;">
+                        <option value="">Select Device Type</option>
+                    </select>
+                    <select id="schema-version" style="padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #e2e8f0;">
+                        <option value="">Select Version</option>
+                    </select>
+                    <button class="btn" onclick="loadSchema()">Load Schema</button>
+                    <button class="btn" onclick="refreshSchemaStats()">Refresh Stats</button>
+                </div>
+                
+                <div class="schema-viewer" id="schema-viewer">
+                    <div class="loading">Select a device type and version to view schema...</div>
+                </div>
+            </div>
+            
+            <div class="schema-comparison">
+                <h3>⚖️ Schema Comparison</h3>
+                <div class="comparison-controls">
+                    <select id="compare-device-type" style="padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #e2e8f0;">
+                        <option value="">Select Device Type</option>
+                    </select>
+                    <select id="compare-version1" style="padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #e2e8f0;">
+                        <option value="">Version 1</option>
+                    </select>
+                    <select id="compare-version2" style="padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #e2e8f0;">
+                        <option value="">Version 2</option>
+                    </select>
+                    <button class="btn" onclick="compareSchemas()">Compare</button>
+                </div>
+                
+                <div class="comparison-result" id="comparison-result">
+                    <div class="loading">Select versions to compare...</div>
+                </div>
+            </div>
+            
+            <div class="validation-results">
+                <h3>✅ Validation Results</h3>
+                <div class="validation-stats">
+                    <div class="validation-metrics">
+                        <span class="metric-label">Recent Violations:</span>
+                        <span class="metric-value" id="recent-violations">-</span>
+                    </div>
+                    <div class="validation-metrics">
+                        <span class="metric-label">Success Rate:</span>
+                        <span class="metric-value" id="success-rate">-</span>
+                    </div>
+                </div>
+                
+                <div class="validation-history" id="validation-history">
+                    <div class="loading">Loading validation history...</div>
+                </div>
             </div>
         </div>
         </div> <!-- End of FDI tab -->
@@ -1026,20 +1202,23 @@
             refreshAllStats();
             populateDeviceDropdown(); // Populate analytics device dropdown
             refreshKafkaMetrics(); // Load Kafka metrics on page load
+            refreshSchemaStats(); // Load schema registry stats
+            populateSchemaDropdowns(); // Populate schema dropdowns
             
-                    // Auto-refresh every 10 seconds
-        setInterval(refreshStatus, 10000);
-        setInterval(refreshDevices, 10000);
-        setInterval(refreshAllStats, 30000); // Comprehensive stats every 30 seconds
-        setInterval(refreshKafkaMetrics, 30000); // Refresh Kafka metrics every 30 seconds
-        
-        // Real-time data flow indicators - update every 2 seconds for live feel
-        setInterval(updateLiveDataFlow, 2000);
-        
-        // Initialize live data counters
-        let messageCounter = 0;
-        let lastMessageTime = Date.now();
-        });
+            // Auto-refresh every 10 seconds
+            setInterval(refreshStatus, 10000);
+            setInterval(refreshDevices, 10000);
+            setInterval(refreshAllStats, 30000); // Comprehensive stats every 30 seconds
+            setInterval(refreshKafkaMetrics, 30000); // Refresh Kafka metrics every 30 seconds
+            setInterval(refreshSchemaStats, 30000); // Refresh schema stats every 30 seconds
+            
+            // Real-time data flow indicators - update every 2 seconds for live feel
+            setInterval(updateLiveDataFlow, 2000);
+            
+                    // Initialize live data counters
+        window.messageCounter = 0;
+        window.lastMessageTime = Date.now();
+    });
         
         // Populate device dropdown for analytics
         async function populateDeviceDropdown() {
@@ -1100,19 +1279,19 @@
         function updateLiveDataFlow() {
             // Simulate live message counter (in real implementation, this would come from API)
             const newMessages = Math.floor(Math.random() * 3) + 1; // 1-3 messages per update
-            messageCounter += newMessages;
+            window.messageCounter += newMessages;
             
             // Update live counters with animation
-            updateCounterWithAnimation('data-throughput', `${messageCounter} msg`);
-            updateCounterWithAnimation('kafka-throughput', `${messageCounter} msg`);
+            updateCounterWithAnimation('data-throughput', `${window.messageCounter} msg`);
+            updateCounterWithAnimation('kafka-throughput', `${window.messageCounter} msg`);
             
             // Update last message time
             const now = Date.now();
-            const timeDiff = now - lastMessageTime;
+            const timeDiff = now - window.lastMessageTime;
             if (timeDiff > 0) {
                 const timeAgo = formatTimeAgo(timeDiff);
                 updateElementWithPulse('last-update', timeAgo);
-                lastMessageTime = now;
+                window.lastMessageTime = now;
             }
             
             // Add pulsing effect to active elements
@@ -1248,6 +1427,223 @@
                 a.download = 'data-stream-export.txt';
                 a.click();
                 URL.revokeObjectURL(url);
+            }
+        }
+        
+        // Schema Registry Functions
+        async function refreshSchemaStats() {
+            try {
+                const response = await fetch('/api/schemas');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const summary = data.data;
+                    document.getElementById('total-schemas').textContent = summary.total_schemas;
+                    document.getElementById('device-types').textContent = summary.total_device_types;
+                    
+                    // Get validation stats
+                    const statsResponse = await fetch('/api/schemas/stats');
+                    const statsData = await statsResponse.json();
+                    
+                    if (statsData.success) {
+                        const stats = statsData.data;
+                        document.getElementById('validation-success').textContent = `${stats.success_rate.toFixed(1)}%`;
+                        document.getElementById('schema-health').textContent = stats.success_rate > 95 ? '🟢 Healthy' : '🟡 Warning';
+                    }
+                }
+            } catch (error) {
+                console.error('Error refreshing schema stats:', error);
+                document.getElementById('total-schemas').textContent = 'Error';
+                document.getElementById('device-types').textContent = 'Error';
+            }
+        }
+        
+        async function loadSchema() {
+            const deviceType = document.getElementById('schema-device-type').value;
+            const version = document.getElementById('schema-version').value;
+            
+            if (!deviceType) {
+                alert('Please select a device type');
+                return;
+            }
+            
+            try {
+                const url = version ? 
+                    `/api/schemas/${deviceType}/${version}` :
+                    `/api/schemas/${deviceType}/latest`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const schema = data.data.schema;
+                    const metadata = data.data.metadata;
+                    
+                    // Parse the schema if it's a string, otherwise use as-is
+                    let parsedSchema;
+                    try {
+                        parsedSchema = typeof schema === 'string' ? JSON.parse(schema) : schema;
+                    } catch (e) {
+                        console.error('Error parsing schema:', e);
+                        parsedSchema = schema;
+                    }
+                    
+                    const schemaViewer = document.getElementById('schema-viewer');
+                    schemaViewer.innerHTML = `
+                        <h4>Schema for ${metadata.device_type} v${metadata.version}</h4>
+                        <p><strong>Generated:</strong> ${metadata.registered_at}</p>
+                        <p><strong>Schema ID:</strong> ${metadata.schema_id}</p>
+                        <p><strong>Manufacturer:</strong> ${metadata.manufacturer}</p>
+                        <p><strong>Model:</strong> ${metadata.model}</p>
+                        <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap;">${JSON.stringify(parsedSchema, null, 2)}</pre>
+                    `;
+                } else {
+                    document.getElementById('schema-viewer').innerHTML = '<div class="error">Schema not found</div>';
+                }
+            } catch (error) {
+                console.error('Error loading schema:', error);
+                document.getElementById('schema-viewer').innerHTML = '<div class="error">Error loading schema</div>';
+            }
+        }
+        
+        async function compareSchemas() {
+            const deviceType = document.getElementById('compare-device-type').value;
+            const version1 = document.getElementById('compare-version1').value;
+            const version2 = document.getElementById('compare-version2').value;
+            
+            if (!deviceType || !version1 || !version2) {
+                alert('Please select device type and both versions');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/schemas/${deviceType}/compare?v1=${version1}&v2=${version2}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const comparison = data.data;
+                    const resultDiv = document.getElementById('comparison-result');
+                    
+                    let html = `<h4>Schema Comparison: ${version1} vs ${version2}</h4>`;
+                    
+                    if (comparison.breaking_changes) {
+                        html += '<div class="alert alert-warning">⚠️ Breaking Changes Detected</div>';
+                    }
+                    
+                    if (comparison.added_fields.length > 0) {
+                        html += '<div class="comparison-diff"><h5>Added Fields:</h5>';
+                        comparison.added_fields.forEach(field => {
+                            html += `<div class="diff-added">+ ${field}</div>`;
+                        });
+                        html += '</div>';
+                    }
+                    
+                    if (comparison.removed_fields.length > 0) {
+                        html += '<div class="comparison-diff"><h5>Removed Fields:</h5>';
+                        comparison.removed_fields.forEach(field => {
+                            html += `<div class="diff-removed">- ${field}</div>`;
+                        });
+                        html += '</div>';
+                    }
+                    
+                    if (comparison.changed_fields.length > 5) {
+                        html += '<div class="comparison-diff"><h5>Changed Fields:</h5>';
+                        comparison.changed_fields.forEach(change => {
+                            html += `<div class="diff-changed">~ ${change.field}</div>`;
+                        });
+                        html += '</div>';
+                    }
+                    
+                    resultDiv.innerHTML = html;
+                } else {
+                    document.getElementById('comparison-result').innerHTML = '<div class="error">Error comparing schemas</div>';
+                }
+            } catch (error) {
+                console.error('Error comparing schemas:', error);
+                document.getElementById('comparison-result').innerHTML = '<div class="error">Error comparing schemas</div>';
+            }
+        }
+        
+        async function populateSchemaDropdowns() {
+            try {
+                console.log('populateSchemaDropdowns called');
+                const response = await fetch('/api/schemas');
+                const data = await response.json();
+                console.log('Schema data received:', data);
+                
+                if (data.success) {
+                    const deviceTypes = Object.keys(data.data.device_types);
+                    console.log('Device types found:', deviceTypes);
+                    
+                    // Populate device type dropdowns
+                    ['schema-device-type', 'compare-device-type'].forEach(id => {
+                        const select = document.getElementById(id);
+                        console.log(`Looking for element with id: ${id}`, select);
+                        if (select) {
+                            select.innerHTML = '<option value="">Select Device Type</option>';
+                            deviceTypes.forEach(deviceType => {
+                                const option = document.createElement('option');
+                                option.value = deviceType;
+                                option.textContent = deviceType;
+                                select.appendChild(option);
+                                console.log(`Added option: ${deviceType}`);
+                            });
+                        }
+                    });
+                    
+                    // Populate version dropdowns for first device type
+                    if (deviceTypes.length > 0) {
+                        const firstDeviceType = deviceTypes[0];
+                        console.log('Populating versions for first device type:', firstDeviceType);
+                        await populateVersionDropdowns(firstDeviceType);
+                        
+                        // Add event listener for device type changes
+                        document.getElementById('schema-device-type').addEventListener('change', async function() {
+                            const selectedDeviceType = this.value;
+                            if (selectedDeviceType) {
+                                await populateVersionDropdowns(selectedDeviceType);
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error populating schema dropdowns:', error);
+            }
+        }
+        
+        async function populateVersionDropdowns(deviceType) {
+            try {
+                console.log('🔍 populateVersionDropdowns called with deviceType:', deviceType);
+                const response = await fetch(`/api/schemas/${deviceType}`);
+                const data = await response.json();
+                console.log('📡 Response data:', data);
+                
+                if (data.success) {
+                    const versions = data.data.versions;
+                    console.log('✅ Versions found:', versions);
+                    
+                    // Populate version dropdowns
+                    ['schema-version', 'compare-version1', 'compare-version2'].forEach(id => {
+                        const select = document.getElementById(id);
+                        console.log(`🎯 Looking for element with id: ${id}`, select);
+                        if (select) {
+                            select.innerHTML = '<option value="">Select Version</option>';
+                            versions.forEach(version => {
+                                const option = document.createElement('option');
+                                option.value = version;
+                                option.textContent = version;
+                                select.appendChild(option);
+                                console.log(`➕ Added version option: ${version}`);
+                            });
+                        } else {
+                            console.error(`❌ Element with id ${id} not found`);
+                        }
+                    });
+                } else {
+                    console.error('❌ API response not successful:', data);
+                }
+            } catch (error) {
+                console.error('❌ Error populating version dropdowns:', error);
             }
         }
         
@@ -2075,7 +2471,7 @@
                 if (!consumers) {
                     consumers = [
                         {
-                            name: 'redpanda-connector',
+                            name: 'redpanda-connect',
                             description: 'RedPanda to TimescaleDB connector',
                             topics: ['iot.raw', 'iot.enriched', 'iot.smart_breaker.enriched'],
                             members: 1,
@@ -2190,7 +2586,7 @@
                 kafka_throughput: '150 msg/s',
                 timescale_storage: '150 msg/s stored',
                 topics: ['iot.raw', 'iot.enriched', 'iot.smart_breaker.enriched'],
-                consumers: ['redpanda-connector', 'enrichment-service']
+                consumers: ['redpanda-connect', 'enrichment-service']
             };
             
             const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });

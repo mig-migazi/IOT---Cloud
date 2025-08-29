@@ -12,6 +12,10 @@ paho-mqtt==1.6.1
 
 # Data handling
 python-dotenv==1.0.0
+requests==2.31.0
+
+# Database support
+psycopg2-binary==2.9.7
 
 # Async support
 asyncio-mqtt==0.13.0

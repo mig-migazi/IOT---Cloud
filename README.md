@@ -147,7 +147,7 @@ Dedicated monitoring for your event streaming infrastructure.
 - **Lag**: Consumer lag for each topic
 
 #### **👥 Consumer Groups**
-- **redpanda-connector**: Service consuming messages for TimescaleDB storage
+- **redpanda-connect**: Official RedPanda Connect service for TimescaleDB storage
 - **enrichment-service**: Service processing and enriching messages
 - **Group Status**: Active/Inactive status of consumer groups
 - **Topics**: Topics consumed by each group
@@ -343,7 +343,7 @@ IOT-Cloud/
 │   │   ├── main.py            # Service entry point
 │   │   ├── templates/         # Dashboard HTML templates
 │   │   └── requirements.txt
-│   ├── redpanda-connector/    # NEW: RedPanda to TimescaleDB connector
+│   ├── redpanda-connect/      # NEW: Official RedPanda Connect for TimescaleDB
 │   │   ├── connector.py       # Main connector application
 │   │   ├── requirements.txt
 │   │   └── Dockerfile
@@ -483,7 +483,7 @@ docker-compose logs -f smart-breaker-simulator
 docker-compose logs -f mqtt-kafka-bridge
 docker-compose logs -f enrichment-service
 docker-compose logs -f fdi-package-manager
-docker-compose logs -f redpanda-connector
+docker-compose logs -f redpanda-connect
 docker-compose logs -f timescaledb
 
 # Force rebuild all services

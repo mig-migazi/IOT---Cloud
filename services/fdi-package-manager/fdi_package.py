@@ -111,9 +111,10 @@ class FDIPackage:
                     
             # Validate commands
             for cmd in self.device_type.commands:
-                if not cmd.name or not cmd.parameters:
+                if not cmd.name:
                     logger.error(f"Command {cmd.name} missing required fields")
                     return False
+                # Parameters can be empty for commands that don't need them
                     
             logger.info("FDI package validation successful", package_id=self.package_id)
             return True

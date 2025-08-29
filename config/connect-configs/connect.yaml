@@ -1,0 +1,60 @@
+input:
+  kafka:
+    addresses:
+      - redpanda:29092
+    topics:
+      - iot.raw
+    consumer_group: "smart-breaker-consumer"
+    checkpoint_limit: 1000
+
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "time": this.timestamp,
+          "device_id": this.device_id,
+          "voltage_phase_a": this.measurements.voltage.phase_a,
+          "voltage_phase_b": this.measurements.voltage.phase_b,
+          "voltage_phase_c": this.measurements.voltage.phase_c,
+          "current_phase_a": this.measurements.current.phase_a,
+          "current_phase_b": this.measurements.current.phase_b,
+          "current_phase_c": this.measurements.current.phase_c,
+          "power_factor": this.measurements.power.factor,
+          "frequency": this.measurements.frequency.value,
+          "temperature": this.measurements.temperature.value,
+          "status": this.measurements.status.breaker
+        }
+
+output:
+  sql_insert:
+    driver: postgres
+    dsn: "postgres://iot_user:iot_password@timescaledb:5432/iot_cloud?sslmode=disable"
+    table: smart_breaker_data
+    columns:
+      - time
+      - device_id
+      - voltage_phase_a
+      - voltage_phase_b
+      - voltage_phase_c
+      - current_phase_a
+      - current_phase_b
+      - current_phase_c
+      - power_factor
+      - frequency
+      - temperature
+      - status
+    args_mapping: |
+      root = [
+        this.time,
+        this.device_id,
+        this.voltage_phase_a,
+        this.voltage_phase_b,
+        this.voltage_phase_c,
+        this.current_phase_a,
+        this.current_phase_b,
+        this.current_phase_c,
+        this.power_factor,
+        this.frequency,
+        this.temperature,
+        this.status
+      ]

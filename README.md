@@ -26,7 +26,7 @@ Smart Breaker Simulator → MQTT Broker → MQTT-Kafka Bridge → RedPanda → E
 - **Enrichment Service**: Adds device metadata, context, and routes data to **both general AND device-type specific topics**
 - **App Registry Service**: Manages applications that register interest in specific device types
 - **FDI Package Manager**: **NEW** - Manages Field Device Integration packages, provides OPC UA interface, and web UI for device management
-- **RedPanda Connector**: **NEW** - Consumes messages from RedPanda and stores them in TimescaleDB for time-series analysis
+- **RedPanda Connect**: **NEW** - Official RedPanda connector (Benthos-based) for consuming messages from RedPanda and storing them in TimescaleDB for time-series analysis
 - **TimescaleDB**: **NEW** - PostgreSQL extension for time-series data with continuous aggregates and compression
 - **Advanced Dashboard**: **NEW** - Comprehensive interface with FDI Management, Data Analytics, and RedPanda/Kafka Metrics tabs
 
@@ -443,16 +443,25 @@ IOT-Cloud/
 
 ### **Advanced Dashboard Interface**
 - **FDI Management**: Package management, device monitoring, parameter control
-- **Data Analytics**: TimescaleDB querying with device and metric selection
+- **Data Analytics**: TimescaleDB querying with device and metric selection, **smart aggregation based on timeframe** (Raw/Hourly/Daily)
+- **Schema Registry**: Schema management, versioning, and validation statistics
+- **Schema Browser**: Interactive schema viewing with proper JSON formatting
 - **RedPanda Metrics**: Message flow monitoring, topic performance, consumer groups
 - **Real-time Updates**: Live data refresh and status monitoring
 - **Timezone Support**: Proper timezone conversion and display
 
 ### **Enhanced Data Pipeline**
-- **RedPanda Connector**: Dedicated service for TimescaleDB integration
+- **RedPanda Connect**: Official RedPanda connector (Benthos-based) for TimescaleDB integration
 - **Data Persistence**: Long-term storage with aggregation
 - **Performance Monitoring**: Comprehensive metrics and health checks
 - **Scalable Architecture**: Easy to add new device types and data sources
+
+### **Schema Registry Integration**
+- **JSON Schema Management**: Automatic schema generation from FDI packages
+- **Schema Versioning**: Support for multiple schema versions with comparison
+- **Validation Engine**: Runtime message validation against registered schemas
+- **Schema Evolution**: Track breaking changes and schema compatibility
+- **Integration**: Seamless integration with FDI Package Manager and Enrichment Service
 
 ## 🚀 Deployment
 
@@ -463,6 +472,21 @@ The platform is containerized with Docker and ready for cloud deployment:
 - **Kubernetes**: Convert docker-compose to K8s manifests
 
 ## 🔧 Troubleshooting
+
+### Recent System Improvements
+
+**System Robustness & Reliability**:
+- **Health Monitoring**: Comprehensive health checks for all services
+- **Retry Logic**: Automatic retry mechanisms with exponential backoff
+- **Fallback Systems**: Graceful degradation when services are unavailable
+- **Startup Scripts**: Proper service initialization and dependency management
+- **Error Handling**: Comprehensive error handling and user-friendly error messages
+
+**Performance & Monitoring**:
+- **Smart Aggregation**: Analytics automatically aggregate data based on timeframe selection
+- **Schema Validation**: Runtime message validation against registered schemas
+- **Real-time Updates**: Live dashboard updates with proper error handling
+- **Service Integration**: Seamless integration between FDI Package Manager and Schema Registry
 
 ### Common Issues & Solutions
 
@@ -519,18 +543,25 @@ MIT License - see LICENSE file for details.
 
 ## 🎯 Current Status
 
-**✅ FULLY OPERATIONAL** - All services running with new FDI and TimescaleDB features:
+**✅ FULLY OPERATIONAL** - All services running with comprehensive FDI, TimescaleDB, and Schema Registry features:
 
 - **MQTT Simulator**: ✅ Sending data to MQTT topics with burst logic
 - **MQTT Broker**: ✅ Eclipse Mosquitto running and healthy
 - **MQTT Bridge**: ✅ Successfully forwarding MQTT → Kafka
 - **Enrichment Service**: ✅ Processing and routing messages with FDI integration
-- **FDI Package Manager**: ✅ Managing device definitions and providing web UI
-- **RedPanda Connector**: ✅ Storing data in TimescaleDB
-- **TimescaleDB**: ✅ Time-series storage with continuous aggregates
-- **Advanced Dashboard**: ✅ Comprehensive interface with all features
+- **FDI Package Manager**: ✅ Managing device definitions, providing web UI, and Schema Registry integration
+- **RedPanda Connect**: ✅ Official connector storing data in TimescaleDB with smart aggregation
+- **TimescaleDB**: ✅ Time-series storage with continuous aggregates and performance optimization
+- **Schema Registry**: ✅ JSON schema management, versioning, and validation engine
+- **Advanced Dashboard**: ✅ Comprehensive interface with FDI Management, Analytics, Schema Registry, and RedPanda Metrics
 - **App Registry**: ✅ Managing application registrations
 - **Data Flow**: ✅ Complete MQTT → Kafka → Enrichment → TimescaleDB pipeline working
 
-**New Features**: FDI Package Management, TimescaleDB Integration, Advanced Dashboard
-**Status**: All systems operational with enhanced capabilities
+**New Features**: 
+- **Schema Registry Integration**: Automatic schema generation and validation
+- **Smart Analytics Aggregation**: Raw/Hourly/Daily data based on timeframe
+- **RedPanda Connect**: Official connector replacement for better reliability
+- **Enhanced FDI Management**: Robust package management with health checks
+- **Schema Browser**: Interactive schema viewing with proper JSON formatting
+
+**Status**: All systems operational with enterprise-grade capabilities and comprehensive monitoring

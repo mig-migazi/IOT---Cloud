@@ -28,5 +28,15 @@
     "resource_type": "string",
     "value": "smartbreaker",
     "periodic_update": false
+  },
+  {
+    "object_id": 2222,
+    "object_instance_id": 0,
+    "resource_id": 0,
+    "resource_name": "voltage",
+    "operations": 3,
+    "resource_type": "float",
+    "value": 40.0,
+    "periodic_update": false
   }
 ]

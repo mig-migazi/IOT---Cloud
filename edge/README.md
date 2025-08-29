@@ -15,12 +15,14 @@ This service provides:
 
 - **GRM Registration**: Automatically registers as a Gateway Resource Manager with Edge Core
 - **Resource Management**: Loads and syncs resources from `resources.json`
+- **Cloud Update Reception**: Receives and processes resource updates from the cloud
 - **Health Monitoring**: Continuous health checks and status reporting
 - **Error Recovery**: Automatic retry mechanisms for failed operations
 - **Configuration Management**: Environment-based configuration
 - **Comprehensive Logging**: Detailed logging for debugging and monitoring
 - **WebSocket Communication**: Real-time communication with Edge Core via WebSocket
 - **Periodic Updates**: Simulated sensor data updates with configurable intervals
+- **Bidirectional Communication**: Support for both edge-to-cloud and cloud-to-edge updates
 
 ## Architecture
 
@@ -74,6 +76,7 @@ This service provides:
 4. **Edge Core Communication**: JSON-RPC calls over WebSocket
 5. **Resource Management**: Register GRM, add resources, update values
 6. **Periodic Updates**: Simulated sensor data sent every 30-60 seconds
+7. **Cloud Updates**: Receives and processes updates from cloud via Edge Core
 
 ### Deployment Components
 
@@ -97,7 +100,8 @@ edge/
 │   ├── test_async_service.py # Async service tests
 │   ├── test_periodic_update.py # Periodic update tests
 │   ├── test_temperature_fahrenheit.py # Temperature tests
-│   └── test_config.py    # Configuration tests
+│   ├── test_config.py    # Configuration tests
+│   └── test_cloud_updates.py # Cloud update functionality tests
 ├── resources.json        # Resource definitions
 ├── requirements.txt      # Python dependencies
 ├── Dockerfile           # Container configuration
@@ -257,6 +261,8 @@ The `AsyncResourceManager` class handles resource operations:
 - `delete_single_resource(resource)`: Delete a resource
 - `generate_simulated_values()`: Generate simulated sensor data
 - `update_all_resources()`: Update all resources with simulated values
+- `handle_cloud_update(cloud_update)`: Handle incoming cloud updates
+- `get_cloud_update_stats()`: Get cloud update statistics
 
 ## Service Lifecycle
 
@@ -284,6 +290,282 @@ The service uses structured logging with the following features:
 - **Structured Format**: Includes timestamp, level, module, function, line, and message
 - **Configurable Level**: Set via `LOG_LEVEL` environment variable
 
+## Cloud Update Support
+
+The GRM service now supports receiving and processing updates from the cloud through Edge Core. This enables bidirectional communication where the cloud can remotely manage edge resources.
+
+### Supported Update Types
+
+1. **Resource Updates**: Update specific resource values
+2. **Configuration Updates**: Add, remove, or modify resources
+3. **Commands**: Execute commands on the edge device
+
+### Message Format
+
+Cloud updates are received as JSON messages with the following structure:
+
+```json
+{
+  "type": "resource_update|configuration_update|command",
+  "timestamp": 1640995200.0,
+  "device_id": "device-001",
+  "resource_updates": [...],
+  "metadata": {...}
+}
+```
+
+### Testing Cloud Updates
+
+Run the cloud update test script to verify functionality:
+
+```bash
+cd edge
+python tests/test_cloud_updates.py
+```
+
+## Cloud Update Implementation
+
+The GRM service supports receiving and processing resource updates from the cloud through Edge Core, enabling bidirectional communication where the cloud can:
+
+- Update resource values remotely
+- Modify resource configurations  
+- Send commands to the edge device
+- Manage resource lifecycle
+
+### Architecture
+
+#### Components
+
+1. **EdgeCoreClient** - Enhanced WebSocket client with cloud update support
+2. **AsyncResourceManager** - Resource manager with cloud update processing
+3. **AsyncGRMService** - Main service orchestrating cloud update handling
+4. **CloudUpdateMessage** - Message structure for cloud updates
+
+#### Message Flow
+
+```
+Cloud → Edge Core → GRM Service → Resource Manager → Edge Core
+```
+
+1. Cloud sends update via Edge Core WebSocket
+2. GRM service receives and parses the message
+3. Resource manager processes the update
+4. Changes are applied to local resources and Edge Core
+
+### Message Types
+
+#### 1. Resource Update
+
+Updates specific resource values:
+
+```json
+{
+  "type": "resource_update",
+  "timestamp": 1640995200.0,
+  "device_id": "device-001",
+  "resource_updates": [
+    {
+      "object_id": 1234,
+      "instance_id": 0,
+      "resource_id": 0,
+      "value": 85.5
+    }
+  ]
+}
+```
+
+#### 2. Configuration Update
+
+Modifies resource configurations:
+
+```json
+{
+  "type": "configuration_update",
+  "timestamp": 1640995200.0,
+  "device_id": "device-001",
+  "metadata": {
+    "configuration_changes": {
+      "add_resource": {
+        "object_id": 9999,
+        "instance_id": 0,
+        "resource_id": 0,
+        "resource_name": "new_sensor",
+        "operations": 3,
+        "resource_type": "float",
+        "value": 42.0,
+        "periodic_update": true
+      },
+      "remove_resource": {
+        "object_id": 1234,
+        "instance_id": 0,
+        "resource_id": 1
+      },
+      "modify_resource": {
+        "object_id": 1234,
+        "instance_id": 0,
+        "resource_id": 0,
+        "resource_name": "updated_sensor",
+        "periodic_update": false
+      }
+    }
+  }
+}
+```
+
+#### 3. Command
+
+Executes commands on the edge device:
+
+```json
+{
+  "type": "command",
+  "timestamp": 1640995200.0,
+  "device_id": "device-001",
+  "metadata": {
+    "command": {
+      "type": "set_resource_value",
+      "parameters": {
+        "object_id": 1234,
+        "instance_id": 0,
+        "resource_id": 0,
+        "value": 100.0
+      }
+    }
+  }
+}
+```
+
+### Supported Commands
+
+- **sync_resources**: Synchronizes all local resources with Edge Core
+- **update_all_resources**: Updates all resources with simulated values
+- **set_resource_value**: Sets a specific resource value with parameters:
+  - `object_id`: Object ID
+  - `instance_id`: Object instance ID
+  - `resource_id`: Resource ID
+  - `value`: New value
+
+### Implementation Details
+
+#### EdgeCoreClient Enhancements
+
+```python
+class EdgeCoreClient:
+    def set_cloud_update_callback(self, callback):
+        """Set callback for handling cloud updates"""
+        
+    async def start_message_listening(self):
+        """Start listening for cloud updates"""
+        
+    async def _message_listener_loop(self):
+        """Continuous loop for listening to cloud messages"""
+        
+    async def _handle_cloud_update(self, data):
+        """Handle cloud update message"""
+```
+
+#### Resource Manager Cloud Update Handling
+
+```python
+class AsyncResourceManager:
+    async def handle_cloud_update(self, cloud_update):
+        """Handle incoming cloud update"""
+        
+    async def _handle_resource_update(self, cloud_update):
+        """Handle resource update from cloud"""
+        
+    async def _handle_configuration_update(self, cloud_update):
+        """Handle configuration update from cloud"""
+        
+    async def _handle_command(self, cloud_update):
+        """Handle command from cloud"""
+```
+
+#### Main Service Integration
+
+```python
+class AsyncGRMService:
+    async def _cloud_update_callback(self, cloud_update):
+        """Callback for handling cloud updates"""
+        
+    async def initialize(self):
+        # Set up cloud update callback
+        self.edge_core_client.set_cloud_update_callback(self._cloud_update_callback)
+        
+        # Start listening for cloud updates
+        await self.edge_core_client.start_message_listening()
+```
+
+### Error Handling
+
+#### Connection Management
+- Automatic reconnection on connection loss
+- Message listening restart after reconnection
+- Graceful handling of WebSocket timeouts
+
+#### Update Processing
+- Validation of incoming messages
+- Optimistic local updates with background Edge Core sync
+- Comprehensive error logging and statistics
+
+#### Statistics Tracking
+```python
+cloud_update_stats = {
+    "total_updates": 0,
+    "successful_updates": 0,
+    "failed_updates": 0,
+    "last_update_time": None
+}
+```
+
+### Performance Considerations
+
+1. **Asynchronous Processing**: All cloud updates are processed asynchronously
+2. **Non-blocking**: Message listening doesn't block other operations
+3. **Optimistic Updates**: Local changes applied immediately, Edge Core sync in background
+4. **Timeout Handling**: WebSocket operations include timeouts to prevent hanging
+5. **Resource Management**: Proper cleanup of WebSocket connections and tasks
+
+### Security Considerations
+
+1. **Message Validation**: All incoming messages are validated for required fields
+2. **Resource Verification**: Updates are only applied to existing resources
+3. **Error Isolation**: Failed updates don't affect other operations
+4. **Logging**: All cloud update activities are logged for audit purposes
+
+### Troubleshooting Cloud Updates
+
+#### Common Issues
+
+1. **Connection Lost**
+   - Check Edge Core availability
+   - Verify WebSocket URL configuration
+   - Check network connectivity
+
+2. **Update Failures**
+   - Verify resource exists in local configuration
+   - Check Edge Core response for errors
+   - Review logs for specific error messages
+
+3. **Message Parsing Errors**
+   - Validate message format
+   - Check for required fields
+   - Ensure proper JSON structure
+
+#### Debug Mode
+Enable debug logging by setting:
+```bash
+LOG_LEVEL=DEBUG
+```
+
+### Future Enhancements
+
+1. **Message Queuing**: Implement persistent message queuing for reliability
+2. **Update Batching**: Support for batch resource updates
+3. **Conflict Resolution**: Handle conflicts between local and cloud updates
+4. **Update Validation**: Enhanced validation rules for resource updates
+5. **Metrics Collection**: Detailed metrics for cloud update performance
+
 ## Error Handling
 
 The service includes comprehensive error handling:
@@ -292,6 +574,7 @@ The service includes comprehensive error handling:
 - **Graceful Degradation**: Service continues running even if some operations fail
 - **Detailed Logging**: All errors are logged with context
 - **Health Monitoring**: Continuous health checks detect issues
+- **Cloud Update Error Handling**: Validation and rollback for failed cloud updates
 
 ## Simulated Data Generation
 

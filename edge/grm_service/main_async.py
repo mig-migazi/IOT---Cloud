@@ -8,7 +8,7 @@ import time
 from typing import Optional
 from loguru import logger
 from .config import settings
-from .edge_core_client import EdgeCoreClient, ResourceConfig
+from .edge_core_client import EdgeCoreClient, ResourceConfig, CloudUpdateMessage
 from .resource_manager_async import AsyncResourceManager
 
 
@@ -39,7 +39,7 @@ def setup_logging():
 
 
 class AsyncGRMService:
-    """Async GRM Service using Edge Core WebSocket client"""
+    """Async GRM Service using Edge Core WebSocket client with cloud update support"""
     
     def __init__(self):
         self.edge_core_client: Optional[EdgeCoreClient] = None
@@ -52,6 +52,51 @@ class AsyncGRMService:
         setup_logging()
         
         logger.info("Async GRM Service initializing...")
+    
+    async def _cloud_update_callback(self, cloud_update: CloudUpdateMessage):
+        """
+        Callback for handling cloud updates
+        
+        Args:
+            cloud_update: Cloud update message
+        """
+        try:
+            logger.info(f"Processing cloud update: {cloud_update.message_type}")
+            
+            # Handle the cloud update through resource manager
+            results = await self.resource_manager.handle_cloud_update(cloud_update)
+            
+            # Log results with more detail
+            if results["processed"]:
+                if results["updated_resources"] > 0:
+                    logger.info(f"✅ CLOUD UPDATE PROCESSED: {results['updated_resources']} resources updated successfully")
+                    
+                    # Log details about which resources were updated
+                    if cloud_update.is_resource_update() and cloud_update.resource_updates:
+                        for update in cloud_update.resource_updates:
+                            object_id = update.get("object_id")
+                            instance_id = update.get("instance_id")
+                            resource_id = update.get("resource_id")
+                            value = update.get("value")
+                            
+                            # Try to get resource name
+                            resource_name = "unknown"
+                            if self.resource_manager:
+                                resource = self.resource_manager.find_resource(object_id, instance_id, resource_id)
+                                if resource:
+                                    resource_name = resource.resource_name
+                            
+                            logger.info(f"   📊 Resource Updated: {resource_name} = {value}")
+                            logger.info(f"   ⚡ Local update applied immediately, Edge Core sync in background")
+                
+                if results["errors"]:
+                    for error in results["errors"]:
+                        logger.warning(f"Cloud update warning: {error}")
+            else:
+                logger.error(f"❌ CLOUD UPDATE FAILED: {results['errors']}")
+                
+        except Exception as e:
+            logger.error(f"Error in cloud update callback: {e}")
     
     async def initialize(self) -> bool:
         """
@@ -96,6 +141,15 @@ class AsyncGRMService:
             
             # Initialize async resource manager
             self.resource_manager = AsyncResourceManager(self.edge_core_client)
+            
+            # Set resource manager reference in Edge Core client for better logging
+            self.edge_core_client.resource_manager = self.resource_manager
+            
+            # Set up cloud update callback
+            self.edge_core_client.set_cloud_update_callback(self._cloud_update_callback)
+            
+            # Start listening for cloud updates
+            await self.edge_core_client.start_message_listening()
             
             logger.info("Async GRM Service initialized successfully")
             return True
@@ -152,10 +206,19 @@ class AsyncGRMService:
         """Health check loop"""
         while self.running:
             try:
-                # For now, just check if we're still connected
+                # Check Edge Core connection
                 if not self.edge_core_client.connected:
                     logger.warning("Edge Core connection lost, attempting to reconnect...")
                     await self.edge_core_client.connect()
+                    # Restart message listening after reconnection
+                    if self.edge_core_client.connected:
+                        await self.edge_core_client.start_message_listening()
+                
+                # Log cloud update statistics
+                if self.resource_manager:
+                    stats = self.resource_manager.get_cloud_update_stats()
+                    if stats["total_updates"] > 0:
+                        logger.info(f"Cloud update stats: {stats['successful_updates']}/{stats['total_updates']} successful")
                 
                 logger.debug("Health check successful")
                 
@@ -234,7 +297,7 @@ class AsyncGRMService:
         
         # Step 3: Sync resources
         if not await self.sync_resources():
-            logger.warning("Resource sync completed with errors")
+            logger.warning("Resource sync completed with errors (this may be expected)")
             # Don't fail startup for resource sync issues
         
         # Step 4: Start health monitoring

@@ -1,0 +1,42 @@
+[
+  {
+    "object_id": 1234,
+    "object_instance_id": 0,
+    "resource_id": 0,
+    "resource_name": "temperature",
+    "operations": 3,
+    "resource_type": "float",
+    "value": 70.0,
+    "periodic_update": true
+  },
+  {
+    "object_id": 4321,
+    "object_instance_id": 0,
+    "resource_id": 1,
+    "resource_name": "humidity",
+    "operations": 1,
+    "resource_type": "float",
+    "value": 45.0,
+    "periodic_update": true
+  },
+  {
+    "object_id": 1111,
+    "object_instance_id": 0,
+    "resource_id": 2,
+    "resource_name": "device_type",
+    "operations": 1,
+    "resource_type": "string",
+    "value": "smartbreaker",
+    "periodic_update": false
+  },
+  {
+    "object_id": 2222,
+    "object_instance_id": 0,
+    "resource_id": 0,
+    "resource_name": "voltage",
+    "operations": 3,
+    "resource_type": "float",
+    "value": 40.0,
+    "periodic_update": false
+  }
+]

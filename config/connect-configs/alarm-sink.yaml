@@ -1,0 +1,58 @@
+# Redpanda Connect Configuration for Alarm Storage
+# Consumes from iot.alarms topic and stores alarms in TimescaleDB
+
+input:
+  kafka:
+    addresses:
+      - redpanda:29092
+    topics:
+      - iot.alarms
+    consumer_group: "alarm-storage-consumer"
+    checkpoint_limit: 1000
+
+pipeline:
+  processors:
+    # Debug: Log the received message
+    - log:
+        message: "Received alarm: ${!json()}"
+    # Transform alarm data for database storage
+    - mapping: |
+        root = {
+          "alarm_type": this.alarm_type,
+          "device_id": this.device_id,
+          "device_type_id": 1,  # Default to smart_breaker (id=1)
+          "severity": this.severity,
+          "status": this.status,
+          "triggered_at": this.triggered_at,
+          "alarm_message": this.alarm_message,
+          "alarm_data": this.alarm_data.string(),
+          "rule_id": this.rule_id
+        }
+
+output:
+  sql_insert:
+    driver: postgres
+    dsn: "postgres://iot_user:iot_password@timescaledb:5432/iot_cloud?sslmode=disable"
+    table: alarm_instances
+    columns:
+      - alarm_type
+      - device_id
+      - device_type_id
+      - severity
+      - status
+      - triggered_at
+      - alarm_message
+      - alarm_data
+      - rule_id
+    args_mapping: |
+      root = [
+        this.alarm_type,
+        this.device_id,
+        this.device_type_id,
+        this.severity,
+        this.status,
+        this.triggered_at,
+        this.alarm_message,
+        this.alarm_data,
+        this.rule_id
+      ]

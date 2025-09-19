@@ -1,0 +1,51 @@
+input:
+  kafka:
+    addresses:
+      - redpanda:29092
+    topics:
+      - iot.enriched
+    consumer_group: "alarm-processor"
+    checkpoint_limit: 1000
+
+pipeline:
+  processors:
+    # Custom alarm processor that evaluates rules from TimescaleDB
+    - plugin:
+        type: alarm_processor
+        database_url: "postgres://iot_user:iot_password@timescaledb:5432/iot_cloud?sslmode=disable"
+        reload_interval: "30s"
+    
+    # Route messages based on whether they contain alarms
+    - branch:
+        - check: 'this.alarm_type != null'
+          processors:
+            # This is an alarm message - send to alarm topic
+            - mapping: |
+                root = {
+                  "alarm_type": this.alarm_type,
+                  "device_id": this.device_id,
+                  "device_type": this.device_type,
+                  "severity": this.severity,
+                  "status": this.status,
+                  "triggered_at": this.triggered_at,
+                  "alarm_data": this.alarm_data,
+                  "alarm_message": this.alarm_message,
+                  "rule_id": this.rule_id,
+                  "processed_at": now()
+                }
+        
+        - check: 'this.alarm_type == null'
+          processors:
+            # This is regular telemetry - pass through unchanged
+            - mapping: |
+                root = this
+
+output:
+  kafka:
+    addresses:
+      - redpanda:29092
+    topic: "${! if this.alarm_type != null then 'iot.alarms' else 'iot.enriched' }"
+    key: "${! this.device_id }"
+    headers:
+      message_type: "${! if this.alarm_type != null then 'alarm' else 'telemetry' }"
+      severity: "${! this.severity }"

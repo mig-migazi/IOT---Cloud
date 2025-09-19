@@ -774,6 +774,186 @@
             border-radius: 3px;
             margin: 2px 0;
         }
+        
+        /* Alarm Management Styles */
+        .alarm-filters, .history-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .alarm-filters select, .history-filters input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .alarms-list, .alarm-history {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            background: white;
+        }
+        
+        .alarm-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+        
+        .alarm-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .alarm-item:last-child {
+            border-bottom: none;
+        }
+        
+        .alarm-info {
+            flex: 1;
+        }
+        
+        .alarm-type {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        
+        .alarm-device {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 3px;
+        }
+        
+        .alarm-message {
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .alarm-severity {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-right: 10px;
+        }
+        
+        .severity-critical {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .severity-high {
+            background-color: #fd7e14;
+            color: white;
+        }
+        
+        .severity-medium {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .severity-low {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .alarm-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .alarm-actions button {
+            padding: 4px 8px;
+            font-size: 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .btn-acknowledge {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-resolve {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .btn-suppress {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .rules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .rule-item {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            transition: box-shadow 0.2s;
+        }
+        
+        .rule-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .rule-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .rule-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .rule-description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .rule-conditions {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #555;
+        }
     </style>
 </head>
 <body>
@@ -788,6 +968,7 @@
             <button class="tab-btn active" onclick="switchTab('fdi')">🚀 FDI Management</button>
             <button class="tab-btn" onclick="switchTab('timescale')">📊 Data Analytics & Monitoring</button>
             <button class="tab-btn" onclick="switchTab('kafka')">🔄 RedPanda/Kafka Metrics</button>
+            <button class="tab-btn" onclick="switchTab('alarms')">🚨 Alarm Management</button>
         </div>
         
         <!-- FDI Management Tab -->
@@ -1176,6 +1357,89 @@
                 </div>
             </div>
         </div> <!-- End of Kafka tab -->
+        
+        <!-- Alarm Management Tab -->
+        <div id="alarms-tab" class="tab-content">
+            <!-- Alarm Overview -->
+            <div class="card">
+                <h2>🚨 Alarm Overview</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number" id="active-alarms-count">-</div>
+                        <div class="stat-label">Active Alarms</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="critical-alarms-count">-</div>
+                        <div class="stat-label">Critical Alarms</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="high-alarms-count">-</div>
+                        <div class="stat-label">High Severity</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="alarms-today-count">-</div>
+                        <div class="stat-label">Alarms Today</div>
+                    </div>
+                </div>
+                <div>
+                    <button class="btn" onclick="refreshAlarms()">Refresh Alarms</button>
+                    <button class="btn" onclick="acknowledgeAllAlarms()">Acknowledge All</button>
+                    <button class="btn" onclick="clearResolvedAlarms()">Clear Resolved</button>
+                </div>
+            </div>
+            
+            <!-- Alarm Rules Management -->
+            <div class="card">
+                <h2>⚙️ Alarm Rules</h2>
+                <div class="rules-grid" id="alarm-rules">
+                    <div class="loading">Loading alarm rules...</div>
+                </div>
+                <div>
+                    <button class="btn" onclick="refreshAlarmRules()">Refresh Rules</button>
+                    <button class="btn" onclick="toggleRuleStatus()">Toggle Rule Status</button>
+                </div>
+            </div>
+            
+            <!-- Active Alarms List -->
+            <div class="card">
+                <h2>🔴 Active Alarms</h2>
+                <div class="alarm-filters">
+                    <select id="severity-filter" onchange="filterAlarms()">
+                        <option value="">All Severities</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <select id="device-filter" onchange="filterAlarms()">
+                        <option value="">All Devices</option>
+                    </select>
+                    <select id="status-filter" onchange="filterAlarms()">
+                        <option value="active">Active Only</option>
+                        <option value="acknowledged">Acknowledged</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="">All Status</option>
+                    </select>
+                </div>
+                <div class="alarms-list" id="alarms-list">
+                    <div class="loading">Loading active alarms...</div>
+                </div>
+            </div>
+            
+            <!-- Alarm History -->
+            <div class="card">
+                <h2>📊 Alarm History</h2>
+                <div class="history-filters">
+                    <input type="datetime-local" id="start-time" placeholder="Start Time">
+                    <input type="datetime-local" id="end-time" placeholder="End Time">
+                    <button class="btn" onclick="loadAlarmHistory()">Load History</button>
+                    <button class="btn" onclick="exportAlarmHistory()">Export CSV</button>
+                </div>
+                <div class="alarm-history" id="alarm-history">
+                    <div class="loading">Select time range to load alarm history...</div>
+                </div>
+            </div>
+        </div> <!-- End of Alarms tab -->
     </div>
     
     <!-- Device Detail Modal -->
@@ -1272,6 +1536,10 @@
                 refreshAggregates();
             } else if (tabName === 'kafka') {
                 refreshKafkaMetrics(); // Load Kafka metrics when switching to Kafka tab
+            } else if (tabName === 'alarms') {
+                refreshAlarms(); // Load alarms when switching to alarms tab
+                refreshAlarmRules(); // Load alarm rules
+                populateDeviceFilter(); // Populate device filter dropdown
             }
         }
         
@@ -2736,6 +3004,350 @@
             } catch (error) {
                 document.getElementById('analytics-content').innerHTML = '<div class="error">Error loading analytics: ' + error.message + '</div>';
             }
+        }
+        
+        // ============================================================================
+        // ALARM MANAGEMENT FUNCTIONS
+        // ============================================================================
+        
+        // Global alarm data
+        let alarms = [];
+        let alarmRules = [];
+        
+        // Refresh alarm overview statistics
+        async function refreshAlarms() {
+            try {
+                const response = await fetch('/api/alarms');
+                const data = await response.json();
+                
+                if (data.success) {
+                    alarms = data.alarms;
+                    
+                    // Update alarm counts
+                    const counts = data.counts;
+                    document.getElementById('active-alarms-count').textContent = counts.active_alarms || 0;
+                    document.getElementById('critical-alarms-count').textContent = counts.critical_alarms || 0;
+                    document.getElementById('high-alarms-count').textContent = counts.high_alarms || 0;
+                    document.getElementById('alarms-today-count').textContent = counts.alarms_today || 0;
+                    
+                    // Update alarms list
+                    displayAlarms(alarms);
+                } else {
+                    console.error('Error loading alarms:', data.error);
+                    document.getElementById('alarms-list').innerHTML = '<div class="error">Failed to load alarms: ' + data.error + '</div>';
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing alarms:', error);
+                document.getElementById('alarms-list').innerHTML = '<div class="error">Failed to load alarms</div>';
+            }
+        }
+        
+        // Display alarms in the list
+        function displayAlarms(alarmsToShow) {
+            const alarmsList = document.getElementById('alarms-list');
+            
+            if (alarmsToShow.length === 0) {
+                alarmsList.innerHTML = '<div class="no-data">No alarms found</div>';
+                return;
+            }
+            
+            const html = alarmsToShow.map(alarm => `
+                <div class="alarm-item">
+                    <div class="alarm-info">
+                        <div class="alarm-type">${alarm.alarm_type}</div>
+                        <div class="alarm-device">Device: ${alarm.device_id} (${alarm.device_type})</div>
+                        <div class="alarm-message">${alarm.alarm_message}</div>
+                    </div>
+                    <div class="alarm-actions">
+                        <span class="alarm-severity severity-${alarm.severity}">${alarm.severity}</span>
+                        <span class="alarm-status">${alarm.status}</span>
+                        ${alarm.status === 'active' ? `
+                            <button class="btn-acknowledge" onclick="acknowledgeAlarm(${alarm.id})">Acknowledge</button>
+                            <button class="btn-resolve" onclick="resolveAlarm(${alarm.id})">Resolve</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+            
+            alarmsList.innerHTML = html;
+        }
+        
+        // Filter alarms based on selected filters
+        function filterAlarms() {
+            const severityFilter = document.getElementById('severity-filter').value;
+            const deviceFilter = document.getElementById('device-filter').value;
+            const statusFilter = document.getElementById('status-filter').value;
+            
+            let filteredAlarms = alarms;
+            
+            if (severityFilter) {
+                filteredAlarms = filteredAlarms.filter(alarm => alarm.severity === severityFilter);
+            }
+            
+            if (deviceFilter) {
+                filteredAlarms = filteredAlarms.filter(alarm => alarm.device_id === deviceFilter);
+            }
+            
+            if (statusFilter) {
+                filteredAlarms = filteredAlarms.filter(alarm => alarm.status === statusFilter);
+            }
+            
+            displayAlarms(filteredAlarms);
+        }
+        
+        // Acknowledge an alarm
+        async function acknowledgeAlarm(alarmId) {
+            try {
+                const response = await fetch(`/api/alarms/${alarmId}/acknowledge`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        acknowledged_by: 'dashboard_user'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    refreshAlarms();
+                } else {
+                    console.error('Error acknowledging alarm:', data.error);
+                }
+            } catch (error) {
+                console.error('Error acknowledging alarm:', error);
+            }
+        }
+        
+        // Resolve an alarm
+        async function resolveAlarm(alarmId) {
+            try {
+                const response = await fetch(`/api/alarms/${alarmId}/resolve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        resolved_by: 'dashboard_user'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    refreshAlarms();
+                } else {
+                    console.error('Error resolving alarm:', data.error);
+                }
+            } catch (error) {
+                console.error('Error resolving alarm:', error);
+            }
+        }
+        
+        // Acknowledge all active alarms
+        async function acknowledgeAllAlarms() {
+            try {
+                const response = await fetch('/api/alarms/acknowledge-all', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        acknowledged_by: 'dashboard_user'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    refreshAlarms();
+                } else {
+                    console.error('Error acknowledging all alarms:', data.error);
+                }
+            } catch (error) {
+                console.error('Error acknowledging all alarms:', error);
+            }
+        }
+        
+        // Clear resolved alarms
+        async function clearResolvedAlarms() {
+            try {
+                const response = await fetch('/api/alarms/clear-resolved', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    refreshAlarms();
+                } else {
+                    console.error('Error clearing resolved alarms:', data.error);
+                }
+            } catch (error) {
+                console.error('Error clearing resolved alarms:', error);
+            }
+        }
+        
+        // Refresh alarm rules
+        async function refreshAlarmRules() {
+            try {
+                const response = await fetch('/api/alarms/rules');
+                const data = await response.json();
+                
+                if (data.success) {
+                    alarmRules = data.rules;
+                    displayAlarmRules(alarmRules);
+                } else {
+                    console.error('Error loading alarm rules:', data.error);
+                    document.getElementById('alarm-rules').innerHTML = '<div class="error">Failed to load alarm rules: ' + data.error + '</div>';
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing alarm rules:', error);
+                document.getElementById('alarm-rules').innerHTML = '<div class="error">Failed to load alarm rules</div>';
+            }
+        }
+        
+        // Display alarm rules
+        function displayAlarmRules(rules) {
+            const rulesContainer = document.getElementById('alarm-rules');
+            
+            const html = rules.map(rule => `
+                <div class="rule-item">
+                    <div class="rule-header">
+                        <div class="rule-name">${rule.rule_name}</div>
+                        <div class="rule-status status-${rule.is_active ? 'active' : 'inactive'}">
+                            ${rule.is_active ? 'Active' : 'Inactive'}
+                        </div>
+                    </div>
+                    <div class="rule-description">${rule.description}</div>
+                    <div class="rule-conditions">
+                        <strong>Conditions:</strong><br>
+                        ${rule.conditions.map(cond => 
+                            `${cond.field_path} ${cond.operator} ${cond.threshold_value}`
+                        ).join('<br>')}
+                    </div>
+                </div>
+            `).join('');
+            
+            rulesContainer.innerHTML = html;
+        }
+        
+        // Toggle rule status
+        function toggleRuleStatus() {
+            // This would typically open a modal or form to edit rule status
+            alert('Rule status toggle functionality - would open rule management interface');
+        }
+        
+        // Populate device filter dropdown
+        async function populateDeviceFilter() {
+            try {
+                const deviceSelect = document.getElementById('device-filter');
+                if (deviceSelect) {
+                    // Get unique device IDs from alarms
+                    const deviceIds = [...new Set(alarms.map(alarm => alarm.device_id))];
+                    
+                    deviceSelect.innerHTML = '<option value="">All Devices</option>';
+                    deviceIds.forEach(deviceId => {
+                        const option = document.createElement('option');
+                        option.value = deviceId;
+                        option.textContent = deviceId;
+                        deviceSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error populating device filter:', error);
+            }
+        }
+        
+        // Load alarm history
+        function loadAlarmHistory() {
+            const startTime = document.getElementById('start-time').value;
+            const endTime = document.getElementById('end-time').value;
+            
+            if (!startTime || !endTime) {
+                alert('Please select both start and end times');
+                return;
+            }
+            
+            // Mock alarm history data
+            const historyAlarms = [
+                {
+                    alarm_type: 'High Voltage Phase A',
+                    device_id: 'breaker-001',
+                    severity: 'high',
+                    status: 'resolved',
+                    triggered_at: new Date(Date.now() - 3600000).toISOString(),
+                    resolved_at: new Date(Date.now() - 3000000).toISOString()
+                },
+                {
+                    alarm_type: 'Low Power Factor',
+                    device_id: 'breaker-001',
+                    severity: 'medium',
+                    status: 'resolved',
+                    triggered_at: new Date(Date.now() - 7200000).toISOString(),
+                    resolved_at: new Date(Date.now() - 6000000).toISOString()
+                }
+            ];
+            
+            displayAlarmHistory(historyAlarms);
+        }
+        
+        // Display alarm history
+        function displayAlarmHistory(historyAlarms) {
+            const historyContainer = document.getElementById('alarm-history');
+            
+            if (historyAlarms.length === 0) {
+                historyContainer.innerHTML = '<div class="no-data">No alarm history found for selected time range</div>';
+                return;
+            }
+            
+            const html = historyAlarms.map(alarm => `
+                <div class="alarm-item">
+                    <div class="alarm-info">
+                        <div class="alarm-type">${alarm.alarm_type}</div>
+                        <div class="alarm-device">Device: ${alarm.device_id}</div>
+                        <div class="alarm-message">
+                            Triggered: ${new Date(alarm.triggered_at).toLocaleString()}
+                            ${alarm.resolved_at ? ` | Resolved: ${new Date(alarm.resolved_at).toLocaleString()}` : ''}
+                        </div>
+                    </div>
+                    <div class="alarm-actions">
+                        <span class="alarm-severity severity-${alarm.severity}">${alarm.severity}</span>
+                        <span class="alarm-status">${alarm.status}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            historyContainer.innerHTML = html;
+        }
+        
+        // Export alarm history to CSV
+        function exportAlarmHistory() {
+            const historyAlarms = alarms.filter(alarm => alarm.status === 'resolved');
+            
+            if (historyAlarms.length === 0) {
+                alert('No alarm history to export');
+                return;
+            }
+            
+            // Create CSV content
+            const csvContent = [
+                'Alarm Type,Device ID,Severity,Status,Triggered At,Resolved At',
+                ...historyAlarms.map(alarm => 
+                    `"${alarm.alarm_type}","${alarm.device_id}","${alarm.severity}","${alarm.status}","${alarm.triggered_at}","${alarm.resolved_at || ''}"`
+                )
+            ].join('\n');
+            
+            // Download CSV file
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `alarm_history_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
         }
     </script>
 </body>

@@ -1,0 +1,316 @@
+import json
+import time
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# Global processor instance
+processor = None
+
+def init_processor():
+    global processor
+    if processor is None:
+        processor = AlarmProcessor({
+            'database_url': 'postgres://iot_user:iot_password@timescaledb:5432/iot_cloud',
+            'reload_interval': 30
+        })
+        processor.load_rules()
+
+def process_message(msg):
+    global processor
+    if processor is None:
+        init_processor()
+    
+    try:
+        # Parse the message
+        message_data = json.loads(msg)
+        
+        # Process for alarms
+        alarms = processor.process_message(message_data)
+        
+        # If alarms found, create alarm messages
+        if alarms:
+            result = []
+            for alarm in alarms:
+                alarm_msg = {
+                    "alarm_type": alarm["alarm_type"],
+                    "device_id": alarm["device_id"],
+                    "device_type": alarm["device_type"],
+                    "severity": alarm["severity"],
+                    "status": alarm["status"],
+                    "triggered_at": alarm["triggered_at"],
+                    "alarm_data": alarm["alarm_data"],
+                    "alarm_message": alarm["alarm_message"],
+                    "rule_id": alarm["rule_id"],
+                    "processed_at": time.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+                }
+                result.append(json.dumps(alarm_msg))
+            
+            return result
+        else:
+            # No alarms, pass through original message
+            return [msg]
+            
+    except Exception as e:
+        print(f"Error processing message: {e}")
+        return [msg]
+
+class AlarmProcessor:
+    def __init__(self, config):
+        self.database_url = config.get('database_url')
+        self.reload_interval = config.get('reload_interval', 30)
+        self.rules_cache = {}
+        self.last_reload = 0
+        self.db_connection = None
+    
+    def connect_database(self):
+        try:
+            self.db_connection = psycopg2.connect(self.database_url)
+            print("Connected to TimescaleDB successfully")
+        except Exception as e:
+            print(f"Failed to connect to database: {e}")
+            raise
+    
+    def load_rules(self):
+        if not self.db_connection:
+            self.connect_database()
+        
+        try:
+            with self.db_connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT 
+                        ar.id, ar.rule_name, ar.device_type_id, ar.category_id, 
+                        ar.is_active, ar.priority, ar.description,
+                        dt.device_type,
+                        ac.severity_level
+                    FROM alarm_rules ar
+                    JOIN device_types dt ON ar.device_type_id = dt.id
+                    JOIN alarm_categories ac ON ar.category_id = ac.id
+                    WHERE ar.is_active = true
+                    ORDER BY ar.priority ASC, ar.id ASC
+                """
+                
+                cursor.execute(query)
+                rules_data = cursor.fetchall()
+                
+                new_rules = {}
+                for rule in rules_data:
+                    device_type = rule['device_type']
+                    if device_type not in new_rules:
+                        new_rules[device_type] = []
+                    
+                    conditions = self.load_rule_conditions(rule['id'])
+                    actions = self.load_rule_actions(rule['id'])
+                    
+                    rule_dict = {
+                        'id': rule['id'],
+                        'rule_name': rule['rule_name'],
+                        'device_type_id': rule['device_type_id'],
+                        'category_id': rule['category_id'],
+                        'is_active': rule['is_active'],
+                        'priority': rule['priority'],
+                        'description': rule['description'],
+                        'severity_level': rule['severity_level'],
+                        'conditions': conditions,
+                        'actions': actions
+                    }
+                    
+                    new_rules[device_type].append(rule_dict)
+                
+                self.rules_cache = new_rules
+                self.last_reload = time.time()
+                print(f"Loaded {len(new_rules)} device types with alarm rules")
+                
+        except Exception as e:
+            print(f"Failed to load rules: {e}")
+            raise
+    
+    def load_rule_conditions(self, rule_id):
+        try:
+            with self.db_connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT id, condition_order, field_path, operator, threshold_value, 
+                           threshold_unit, logical_operator, time_window, consecutive_count, description
+                    FROM rule_conditions
+                    WHERE rule_id = %s
+                    ORDER BY condition_order ASC
+                """
+                
+                cursor.execute(query, (rule_id,))
+                conditions = cursor.fetchall()
+                return [dict(condition) for condition in conditions]
+                
+        except Exception as e:
+            print(f"Failed to load conditions for rule {rule_id}: {e}")
+            return []
+    
+    def load_rule_actions(self, rule_id):
+        try:
+            with self.db_connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT id, action_type, action_config, action_order
+                    FROM rule_actions
+                    WHERE rule_id = %s
+                    ORDER BY action_order ASC
+                """
+                
+                cursor.execute(query, (rule_id,))
+                actions = cursor.fetchall()
+                return [dict(action) for action in actions]
+                
+        except Exception as e:
+            print(f"Failed to load actions for rule {rule_id}: {e}")
+            return []
+    
+    def process_message(self, message):
+        if time.time() - self.last_reload > self.reload_interval:
+            try:
+                self.load_rules()
+            except Exception as e:
+                print(f"Failed to reload rules: {e}")
+        
+        device_type = message.get('device_type')
+        device_id = message.get('device_id')
+        
+        if not device_type or not device_id:
+            return []
+        
+        rules = self.rules_cache.get(device_type, [])
+        if not rules:
+            return []
+        
+        alarms = []
+        for rule in rules:
+            if not rule['is_active']:
+                continue
+                
+            if self.evaluate_rule(message, rule):
+                alarm = {
+                    'alarm_type': rule['rule_name'],
+                    'device_id': device_id,
+                    'device_type': device_type,
+                    'severity': rule['severity_level'],
+                    'status': 'active',
+                    'triggered_at': time.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'alarm_data': message.get('measurements', {}),
+                    'alarm_message': rule['description'],
+                    'rule_id': rule['id']
+                }
+                alarms.append(alarm)
+        
+        return alarms
+    
+    def evaluate_rule(self, message, rule):
+        conditions = rule.get('conditions', [])
+        if not conditions:
+            return False
+        
+        result = self.evaluate_condition(message, conditions[0])
+        
+        for i in range(1, len(conditions)):
+            condition = conditions[i]
+            condition_result = self.evaluate_condition(message, condition)
+            
+            logical_op = condition.get('logical_operator', 'AND')
+            if logical_op == 'AND':
+                result = result and condition_result
+            elif logical_op == 'OR':
+                result = result or condition_result
+            elif logical_op == 'NOT':
+                result = result and not condition_result
+            else:
+                result = result and condition_result
+        
+        return result
+    
+    def evaluate_condition(self, message, condition):
+        field_path = condition.get('field_path', '')
+        operator = condition.get('operator', '')
+        threshold_value = condition.get('threshold_value')
+        
+        value = self.extract_value(message, field_path)
+        if value is None:
+            return False
+        
+        try:
+            if isinstance(threshold_value, str):
+                threshold = json.loads(threshold_value)
+            else:
+                threshold = threshold_value
+        except (json.JSONDecodeError, TypeError):
+            threshold = threshold_value
+        
+        if operator == 'gt':
+            return self.compare_values(value, threshold, '>')
+        elif operator == 'gte':
+            return self.compare_values(value, threshold, '>=')
+        elif operator == 'lt':
+            return self.compare_values(value, threshold, '<')
+        elif operator == 'lte':
+            return self.compare_values(value, threshold, '<=')
+        elif operator == 'eq':
+            return self.compare_values(value, threshold, '==')
+        elif operator == 'ne':
+            return self.compare_values(value, threshold, '!=')
+        elif operator == 'between':
+            return self.is_between(value, threshold)
+        elif operator == 'not_between':
+            return not self.is_between(value, threshold)
+        elif operator == 'out_of_range':
+            return not self.is_in_range(value, threshold)
+        elif operator == 'is_null':
+            return value is None
+        elif operator == 'is_not_null':
+            return value is not None
+        else:
+            return False
+    
+    def extract_value(self, message, field_path):
+        parts = field_path.split('.')
+        current = message
+        
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                return None
+        
+        return current
+    
+    def compare_values(self, value, threshold, operator):
+        try:
+            val_float = float(value)
+            thresh_float = float(threshold)
+            
+            if operator == '>':
+                return val_float > thresh_float
+            elif operator == '>=':
+                return val_float >= thresh_float
+            elif operator == '<':
+                return val_float < thresh_float
+            elif operator == '<=':
+                return val_float <= thresh_float
+            elif operator == '==':
+                return val_float == thresh_float
+            elif operator == '!=':
+                return val_float != thresh_float
+            else:
+                return False
+        except (ValueError, TypeError):
+            if operator == '==':
+                return str(value) == str(threshold)
+            elif operator == '!=':
+                return str(value) != str(threshold)
+            else:
+                return False
+    
+    def is_between(self, value, threshold):
+        try:
+            val_float = float(value)
+            min_val = float(threshold.get('min', 0))
+            max_val = float(threshold.get('max', 0))
+            return min_val <= val_float <= max_val
+        except (ValueError, TypeError, KeyError):
+            return False
+    
+    def is_in_range(self, value, threshold):
+        return self.is_between(value, threshold)

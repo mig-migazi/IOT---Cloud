@@ -90,6 +90,27 @@ def auto_initialize_fdi():
         # Wait for initialization
         time.sleep(5)
         
+        # Register schemas for existing packages
+        try:
+            print("📋 AUTO-INIT: Registering schemas for existing packages...")
+            packages = fdi_storage.list_packages()
+            for package in packages:
+                try:
+                    package_data = fdi_storage.retrieve_package(package['package_id'])
+                    if package_data:
+                        schema_registered = register_schema_with_registry(package_data)
+                        if schema_registered:
+                            print(f"✅ AUTO-INIT: Schema registered for {package['device_type']} v{package['version']}")
+                        else:
+                            print(f"⚠️ AUTO-INIT: Schema registration failed for {package['device_type']} v{package['version']}")
+                except Exception as e:
+                    print(f"❌ AUTO-INIT: Error registering schema for {package['device_type']}: {e}")
+                    logger.error(f"Error registering schema for {package['device_type']}", error=str(e))
+            print("✅ AUTO-INIT: Schema registration complete!")
+        except Exception as e:
+            print(f"❌ AUTO-INIT: Error during schema registration: {e}")
+            logger.error("Error during schema registration", error=str(e))
+        
         print("🎉 AUTO-INIT: FDI initialization complete!")
         logger.info("FDI auto-initialization complete!")
         
@@ -1660,6 +1681,400 @@ def get_device_schemas(device_type):
         return jsonify({'error': 'Schema Registry not accessible'}), 503
     except Exception as e:
         logger.error(f"Error fetching device schemas: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================================
+# ALARM MANAGEMENT API ENDPOINTS
+# ============================================================================
+
+@app.route('/api/alarms')
+def get_alarms():
+    """Get active alarms from TimescaleDB"""
+    try:
+        # Connect to TimescaleDB
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        conn = psycopg2.connect(
+            host='timescaledb',
+            database='iot_cloud',
+            user='iot_user',
+            password='iot_password',
+            port=5432
+        )
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            # Get active alarms
+            cursor.execute("""
+                SELECT 
+                    ai.id,
+                    ai.alarm_type,
+                    ai.device_id,
+                    dt.device_type,
+                    ai.severity,
+                    ai.status,
+                    ai.triggered_at,
+                    ai.alarm_message,
+                    ai.alarm_data,
+                    ai.acknowledged_at,
+                    ai.acknowledged_by,
+                    ai.resolved_at,
+                    ar.rule_name,
+                    ar.priority
+                FROM alarm_instances ai
+                LEFT JOIN alarm_rules ar ON ai.rule_id = ar.id
+                LEFT JOIN device_types dt ON ai.device_type_id = dt.id
+                WHERE ai.status IN ('active', 'acknowledged')
+                ORDER BY ai.triggered_at DESC
+                LIMIT 100
+            """)
+            
+            alarms = cursor.fetchall()
+            
+            # Convert to list of dicts
+            alarm_list = []
+            for alarm in alarms:
+                alarm_dict = dict(alarm)
+                alarm_list.append(alarm_dict)
+            
+            # Get alarm counts
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_alarms,
+                    COUNT(CASE WHEN status = 'active' THEN 1 END) as active_alarms,
+                    COUNT(CASE WHEN severity = 'critical' AND status = 'active' THEN 1 END) as critical_alarms,
+                    COUNT(CASE WHEN severity = 'high' AND status = 'active' THEN 1 END) as high_alarms,
+                    COUNT(CASE WHEN triggered_at >= CURRENT_DATE THEN 1 END) as alarms_today
+                FROM alarm_instances
+            """)
+            
+            counts = cursor.fetchone()
+            
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'alarms': alarm_list,
+            'counts': dict(counts) if counts else {},
+            'total': len(alarm_list)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching alarms: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alarms/rules')
+def get_alarm_rules():
+    """Get alarm rules from TimescaleDB"""
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        conn = psycopg2.connect(
+            host='timescaledb',
+            database='iot_cloud',
+            user='iot_user',
+            password='iot_password',
+            port=5432
+        )
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            # Get alarm rules with conditions
+            cursor.execute("""
+                SELECT 
+                    r.id,
+                    r.rule_name,
+                    r.description,
+                    r.is_active,
+                    r.priority,
+                    r.created_at,
+                    r.updated_at,
+                    dt.device_type,
+                    ac.category_name,
+                    ac.severity_level,
+                    COUNT(rc.id) as condition_count
+                FROM alarm_rules r
+                LEFT JOIN device_types dt ON r.device_type_id = dt.id
+                LEFT JOIN alarm_categories ac ON r.category_id = ac.id
+                LEFT JOIN rule_conditions rc ON r.id = rc.rule_id
+                GROUP BY r.id, r.rule_name, r.description, r.is_active, r.priority, 
+                         r.created_at, r.updated_at, dt.device_type, ac.category_name, ac.severity_level
+                ORDER BY r.priority ASC, r.rule_name ASC
+            """)
+            
+            rules = cursor.fetchall()
+            
+            # Get conditions for each rule
+            rule_list = []
+            for rule in rules:
+                rule_dict = dict(rule)
+                
+                # Get conditions for this rule
+                cursor.execute("""
+                    SELECT 
+                        condition_order,
+                        field_path,
+                        operator,
+                        threshold_value,
+                        threshold_unit,
+                        logical_operator,
+                        description
+                    FROM rule_conditions
+                    WHERE rule_id = %s
+                    ORDER BY condition_order ASC
+                """, (rule['id'],))
+                
+                conditions = cursor.fetchall()
+                rule_dict['conditions'] = [dict(cond) for cond in conditions]
+                rule_list.append(rule_dict)
+            
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'rules': rule_list,
+            'total': len(rule_list)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching alarm rules: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alarms/history')
+def get_alarm_history():
+    """Get alarm history from TimescaleDB"""
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        # Get query parameters
+        start_time = request.args.get('start_time')
+        end_time = request.args.get('end_time')
+        device_id = request.args.get('device_id')
+        severity = request.args.get('severity')
+        status = request.args.get('status')
+        
+        conn = psycopg2.connect(
+            host='timescaledb',
+            database='iot_cloud',
+            user='iot_user',
+            password='iot_password',
+            port=5432
+        )
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            # Build query with filters
+            query = """
+                SELECT 
+                    ai.id,
+                    ai.alarm_type,
+                    ai.device_id,
+                    dt.device_type,
+                    ai.severity,
+                    ai.status,
+                    ai.triggered_at,
+                    ai.alarm_message,
+                    ai.acknowledged_at,
+                    ai.acknowledged_by,
+                    ai.resolved_at,
+                    ar.rule_name
+                FROM alarm_instances ai
+                LEFT JOIN alarm_rules ar ON ai.rule_id = ar.id
+                LEFT JOIN device_types dt ON ai.device_type_id = dt.id
+                WHERE 1=1
+            """
+            
+            params = []
+            
+            if start_time:
+                query += " AND ai.triggered_at >= %s"
+                params.append(start_time)
+            
+            if end_time:
+                query += " AND ai.triggered_at <= %s"
+                params.append(end_time)
+            
+            if device_id:
+                query += " AND ai.device_id = %s"
+                params.append(device_id)
+            
+            if severity:
+                query += " AND ai.severity = %s"
+                params.append(severity)
+            
+            if status:
+                query += " AND ai.status = %s"
+                params.append(status)
+            
+            query += " ORDER BY ai.triggered_at DESC LIMIT 1000"
+            
+            cursor.execute(query, params)
+            alarms = cursor.fetchall()
+            
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'alarms': [dict(alarm) for alarm in alarms],
+            'total': len(alarms)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching alarm history: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alarms/<int:alarm_id>/acknowledge', methods=['POST'])
+def acknowledge_alarm(alarm_id):
+    """Acknowledge an alarm"""
+    try:
+        import psycopg2
+        
+        data = request.get_json()
+        acknowledged_by = data.get('acknowledged_by', 'system')
+        
+        conn = psycopg2.connect(
+            host='timescaledb',
+            database='iot_cloud',
+            user='iot_user',
+            password='iot_password',
+            port=5432
+        )
+        
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE alarm_instances 
+                SET status = 'acknowledged',
+                    acknowledged_at = NOW(),
+                    acknowledged_by = %s
+                WHERE id = %s
+            """, (acknowledged_by, alarm_id))
+            
+            conn.commit()
+            
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Alarm acknowledged successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error acknowledging alarm: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alarms/<int:alarm_id>/resolve', methods=['POST'])
+def resolve_alarm(alarm_id):
+    """Resolve an alarm"""
+    try:
+        import psycopg2
+        
+        data = request.get_json()
+        resolved_by = data.get('resolved_by', 'system')
+        
+        conn = psycopg2.connect(
+            host='timescaledb',
+            database='iot_cloud',
+            user='iot_user',
+            password='iot_password',
+            port=5432
+        )
+        
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE alarm_instances 
+                SET status = 'resolved',
+                    resolved_at = NOW(),
+                    resolved_by = %s
+                WHERE id = %s
+            """, (resolved_by, alarm_id))
+            
+            conn.commit()
+            
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Alarm resolved successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error resolving alarm: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alarms/acknowledge-all', methods=['POST'])
+def acknowledge_all_alarms():
+    """Acknowledge all active alarms"""
+    try:
+        import psycopg2
+        
+        data = request.get_json()
+        acknowledged_by = data.get('acknowledged_by', 'system')
+        
+        conn = psycopg2.connect(
+            host='timescaledb',
+            database='iot_cloud',
+            user='iot_user',
+            password='iot_password',
+            port=5432
+        )
+        
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE alarm_instances 
+                SET status = 'acknowledged',
+                    acknowledged_at = NOW(),
+                    acknowledged_by = %s
+                WHERE status = 'active'
+            """, (acknowledged_by,))
+            
+            conn.commit()
+            count = cursor.rowcount
+            
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Acknowledged {count} alarms',
+            'count': count
+        })
+        
+    except Exception as e:
+        logger.error(f"Error acknowledging all alarms: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alarms/clear-resolved', methods=['POST'])
+def clear_resolved_alarms():
+    """Clear resolved alarms"""
+    try:
+        import psycopg2
+        
+        conn = psycopg2.connect(
+            host='timescaledb',
+            database='iot_cloud',
+            user='iot_user',
+            password='iot_password',
+            port=5432
+        )
+        
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                DELETE FROM alarm_instances 
+                WHERE status = 'resolved'
+            """)
+            
+            conn.commit()
+            count = cursor.rowcount
+            
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Cleared {count} resolved alarms',
+            'count': count
+        })
+        
+    except Exception as e:
+        logger.error(f"Error clearing resolved alarms: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

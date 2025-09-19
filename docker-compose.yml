@@ -266,6 +266,44 @@ services:
     networks:
       - iot-cloud-network
 
+  # RedPanda Connect - Alarm Storage Connector
+  redpanda-connect-alarm-storage:
+    image: redpandadata/connect:latest
+    container_name: iot-cloud-redpanda-connect-alarm-storage
+    restart: unless-stopped
+    ports:
+      - "8082:8080"  # RedPanda Connect REST API
+    volumes:
+      - ./config/connect-configs/alarm-sink.yaml:/connect.yaml
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
+  # Alarm Processor - Python service for dynamic alarm evaluation
+  alarm-processor:
+    build:
+      context: ./services/alarm-processor
+      no_cache: true
+    container_name: iot-cloud-alarm-processor
+    restart: unless-stopped
+    environment:
+      - KAFKA_BROKER=redpanda:29092
+      - DB_HOST=timescaledb
+      - DB_NAME=iot_cloud
+      - DB_USER=iot_user
+      - DB_PASSWORD=iot_password
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - iot-cloud-network
+
 
 
   # Schema Registry - Manages JSON schemas generated from FDI packages

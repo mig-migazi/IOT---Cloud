@@ -1,6 +1,6 @@
 # ⚡ IoT Cloud Platform with FDI Integration & TimescaleDB
 
-A comprehensive, cloud-ready IoT data pipeline featuring **FDI (Field Device Integration) package management**, **MQTT-based device communication**, real-time message enrichment, **TimescaleDB time-series storage**, and an **advanced dashboard** with device management, analytics, and monitoring capabilities.
+A comprehensive, cloud-ready IoT data pipeline featuring **FDI (Field Device Integration) package management**, **MQTT-based device communication**, real-time message enrichment, **TimescaleDB time-series storage**, **dynamic alarm system**, and an **advanced dashboard** with device management, analytics, monitoring, and alarm management capabilities.
 
 ## 🏗️ Architecture
 
@@ -15,6 +15,10 @@ Smart Breaker Simulator → MQTT Broker → MQTT-Kafka Bridge → RedPanda → E
                                     ↓                                    ↓                    ↓
                             Device Definitions &            Real-time Monitoring      Historical Data Analysis
                             Configuration Management
+                                    ↓
+                            Alarm Processor Service → iot.alarms → Alarm Storage → Alarm Dashboard
+                                    ↓
+                            Dynamic Rule Evaluation & Real-time Alerting
 ```
 
 ### Core Services
@@ -26,9 +30,10 @@ Smart Breaker Simulator → MQTT Broker → MQTT-Kafka Bridge → RedPanda → E
 - **Enrichment Service**: Adds device metadata, context, and routes data to **both general AND device-type specific topics**
 - **App Registry Service**: Manages applications that register interest in specific device types
 - **FDI Package Manager**: **NEW** - Manages Field Device Integration packages, provides OPC UA interface, and web UI for device management
+- **Alarm Processor Service**: **NEW** - Dynamic alarm evaluation engine with real-time rule loading from TimescaleDB
 - **RedPanda Connect**: **NEW** - Official RedPanda connector (Benthos-based) for consuming messages from RedPanda and storing them in TimescaleDB for time-series analysis
 - **TimescaleDB**: **NEW** - PostgreSQL extension for time-series data with continuous aggregates and compression
-- **Advanced Dashboard**: **NEW** - Comprehensive interface with FDI Management, Data Analytics, and RedPanda/Kafka Metrics tabs
+- **Advanced Dashboard**: **NEW** - Comprehensive interface with FDI Management, Data Analytics, Alarm Management, and RedPanda/Kafka Metrics tabs
 
 ## 🚀 Quick Start
 
@@ -128,7 +133,46 @@ Comprehensive monitoring and analytics for your IoT data pipeline.
 - **Timeframe Selection**: Choose analysis period (1h, 6h, 24h, 7d, 30d)
 - **Data Loading**: Load and display historical data from TimescaleDB
 
-### 🔄 **Tab 3: RedPanda/Kafka Metrics**
+### 🚨 **Tab 3: Alarm Management**
+
+Comprehensive alarm system with real-time evaluation and management capabilities.
+
+#### **🚨 Alarm Overview Section**
+- **Total Alarms**: Real-time count of all alarms in the system
+- **Active Alarms**: Currently active alarms requiring attention
+- **Critical Alarms**: High-priority alarms that need immediate action
+- **Alarms Today**: Number of alarms generated in the current day
+- **Controls**: Refresh alarm data, clear resolved alarms
+
+#### **📊 Alarm Statistics Section**
+- **Alarm Types**: Breakdown of alarms by type (voltage, current, temperature, etc.)
+- **Severity Distribution**: Critical, high, medium, low alarm counts
+- **Device Alarms**: Alarms grouped by device ID
+- **Time-based Trends**: Alarm generation patterns over time
+- **Resolution Status**: Active vs resolved alarm counts
+
+#### **🔍 Alarm Rules Management Section**
+- **Rule Categories**: Different types of alarm rules (voltage, current, temperature, etc.)
+- **Rule Conditions**: Range-based and condition-based evaluation rules
+- **Device Type Rules**: Rules specific to different device types
+- **Rule Status**: Active/inactive rule status
+- **Rule Management**: Create, edit, and manage alarm rules
+
+#### **📋 Live Alarm Feed Section**
+- **Real-time Alarms**: Live stream of newly triggered alarms
+- **Alarm Details**: Complete alarm information including device, rule, and context
+- **Alarm Data**: Enriched telemetry data that triggered the alarm
+- **Timestamp**: When the alarm was triggered
+- **Severity**: Alarm severity level and priority
+
+#### **⚙️ Alarm Configuration Section**
+- **Rule Templates**: Pre-defined rule templates for common scenarios
+- **Device Type Mapping**: Rules mapped to specific device types
+- **Threshold Management**: Configurable thresholds for different measurements
+- **Time Windows**: Configurable time windows for alarm evaluation
+- **Consecutive Counts**: Rules for consecutive threshold violations
+
+### 🔄 **Tab 4: RedPanda/Kafka Metrics**
 
 Dedicated monitoring for your event streaming infrastructure.
 
@@ -213,12 +257,16 @@ The system supports **MQTT-based IoT communication** with seamless Kafka integra
 - **`iot.raw`** → Raw device messages (from MQTT)
 - **`iot.enriched`** → General enriched messages (all device types)
 - **`iot.smart_breaker.enriched`** → Smart breaker data only (for Smart Grid Monitor app)
+- **`iot.alarms`** → Alarm messages (from Alarm Processor Service)
 
 **TimescaleDB Tables:**
 - **`iot_raw_data`** → Raw messages with time-series optimization
 - **`iot_enriched_data`** → Enriched messages with device metadata
 - **`smart_breaker_data`** → Smart breaker specific data
 - **`device_metadata`** → Device configuration and capabilities
+- **`alarm_instances`** → Alarm records with device and rule information
+- **`alarm_rules`** → Dynamic alarm rules and conditions
+- **`device_types`** → Device type definitions for alarm rules
 
 ### Raw Message (from simulator)
 ```json
@@ -343,6 +391,10 @@ IOT-Cloud/
 │   │   ├── main.py            # Service entry point
 │   │   ├── templates/         # Dashboard HTML templates
 │   │   └── requirements.txt
+│   ├── alarm-processor/       # NEW: Dynamic alarm evaluation service
+│   │   ├── alarm_processor.py # Main alarm evaluation engine
+│   │   ├── requirements.txt   # Python dependencies
+│   │   └── Dockerfile         # Container configuration
 │   ├── redpanda-connect/      # NEW: Official RedPanda Connect for TimescaleDB
 │   │   ├── connector.py       # Main connector application
 │   │   ├── requirements.txt
@@ -389,9 +441,19 @@ IOT-Cloud/
 - **Retention Policies**: Configurable data retention and cleanup
 - **Hypertables**: Automatic time-based partitioning for performance
 
+### **NEW: Dynamic Alarm System**
+- **Real-time Evaluation**: Dynamic alarm rule evaluation with live data processing
+- **Rule Management**: Database-driven alarm rules with device type mapping
+- **JSON Path Evaluation**: Flexible field evaluation using JSON Path expressions
+- **Multiple Operators**: Support for range, comparison, and condition-based rules
+- **Time Windows**: Configurable time windows and consecutive count conditions
+- **Alarm Storage**: Persistent alarm storage with TimescaleDB integration
+- **Dashboard Integration**: Comprehensive alarm management in web interface
+
 ### **NEW: Advanced Dashboard**
 - **FDI Management Tab**: Manage FDI packages, view devices, and control parameters
 - **Data Analytics Tab**: Query TimescaleDB data with device and metric selection
+- **Alarm Management Tab**: Real-time alarm monitoring, rule management, and statistics
 - **RedPanda/Kafka Metrics Tab**: Monitor message flow, topics, and consumer groups
 - **Real-time Updates**: Live data refresh and device status monitoring
 - **Timezone Support**: Proper timezone conversion for data display
@@ -543,21 +605,25 @@ MIT License - see LICENSE file for details.
 
 ## 🎯 Current Status
 
-**✅ FULLY OPERATIONAL** - All services running with comprehensive FDI, TimescaleDB, and Schema Registry features:
+**✅ FULLY OPERATIONAL** - All services running with comprehensive FDI, TimescaleDB, Schema Registry, and Alarm System features:
 
 - **MQTT Simulator**: ✅ Sending data to MQTT topics with burst logic
 - **MQTT Broker**: ✅ Eclipse Mosquitto running and healthy
 - **MQTT Bridge**: ✅ Successfully forwarding MQTT → Kafka
 - **Enrichment Service**: ✅ Processing and routing messages with FDI integration
 - **FDI Package Manager**: ✅ Managing device definitions, providing web UI, and Schema Registry integration
+- **Alarm Processor Service**: ✅ Dynamic alarm evaluation with real-time rule loading and processing
 - **RedPanda Connect**: ✅ Official connector storing data in TimescaleDB with smart aggregation
 - **TimescaleDB**: ✅ Time-series storage with continuous aggregates and performance optimization
 - **Schema Registry**: ✅ JSON schema management, versioning, and validation engine
-- **Advanced Dashboard**: ✅ Comprehensive interface with FDI Management, Analytics, Schema Registry, and RedPanda Metrics
+- **Advanced Dashboard**: ✅ Comprehensive interface with FDI Management, Analytics, Alarm Management, Schema Registry, and RedPanda Metrics
 - **App Registry**: ✅ Managing application registrations
 - **Data Flow**: ✅ Complete MQTT → Kafka → Enrichment → TimescaleDB pipeline working
+- **Alarm Flow**: ✅ Complete Enriched Data → Alarm Processor → Alarm Storage → Dashboard pipeline working
 
 **New Features**: 
+- **Dynamic Alarm System**: Real-time alarm evaluation with database-driven rules
+- **Alarm Management Dashboard**: Comprehensive alarm monitoring and rule management
 - **Schema Registry Integration**: Automatic schema generation and validation
 - **Smart Analytics Aggregation**: Raw/Hourly/Daily data based on timeframe
 - **RedPanda Connect**: Official connector replacement for better reliability

@@ -318,6 +318,18 @@ docker-compose logs -f fdi-package-manager
 
 ## 📚 **Documentation**
 
+### **Comprehensive Architecture Documentation**
+For detailed technical documentation about the FDI implementation, architecture patterns, and code-level details, see:
+
+📖 **[FDI Architecture Documentation](docs/FDI_ARCHITECTURE.md)** - Complete technical reference covering:
+- FDI architecture principles and patterns
+- Protocol adapter pattern implementation
+- Data models and communication flows
+- API reference with examples
+- Extension guide for new device types and protocols
+- Best practices and troubleshooting
+
+### **External Standards**
 - **FDI Standard**: [OPC Foundation FDI](https://opcfoundation.org/fdi/)
 - **Sparkplug B**: [Eclipse Tahu](https://github.com/eclipse/tahu)
 - **OPC UA**: [OPC Foundation](https://opcfoundation.org/)
